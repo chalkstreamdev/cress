@@ -14,12 +14,22 @@ cress targets Python 3.14.
 
 ## Quickstart
 
-1. **Tell cress where your vault lives** (optional — can also be passed as `--vault`):
+1. **Tell cress where your vault lives.** cress resolves the vault path from the first source available, in this order:
+
+   1. `--vault` on the command line
+   2. `vault:` in the user config (`~/.config/cress/config.yaml`)
+   3. `vault:` in the site config (`<target>/.cress/config.yaml`)
+   4. the `CRESS_VAULT` environment variable
 
 ```yaml
 # ~/.config/cress/config.yaml
 vault: /Users/me/Obsidian/Main
 ```
+
+   Setting `vault:` in the **site config** is what makes a synced-drive,
+   multi-machine setup zero-config: the path travels with the repo, so a second
+   machine that shares the same repos+vault tree needs no per-user setup. A
+   relative `vault:` there is resolved against the target repo (e.g. `../Vault`).
 
 2. **Add `.cress/config.yaml` to your product repo**:
 
@@ -80,6 +90,10 @@ The full `.cress/config.yaml` schema:
 # Required
 vault_subfolder: "Blogs/MyProduct"   # relative to the vault root
 output_dir: "public/blog"             # relative to the target repo
+
+# Optional — vault location fallback (see Quickstart step 1 for the full
+# resolution order). A relative path is resolved against this repo.
+vault: "../Vault"
 
 site:
   title: "My Blog"

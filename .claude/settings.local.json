@@ -3,5 +3,9 @@
     "allow": [
       "Bash(uv run *)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": false
   }
 }

@@ -10,6 +10,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from django.template import Engine
 
@@ -32,6 +33,10 @@ class PageContext:
     # across every page. Empty by default so consumers without a frontend
     # build pipeline render unstyled, per spec.
     stylesheets: tuple[str, ...] = ()
+    # Site-wide fallback ``og:image`` URL (from ``site.default_image``). A post
+    # with its own resolved hero image overrides this; pages without a hero fall
+    # back to it. ``None`` when no default image is configured.
+    default_image_url: str | None = None
 
 
 def _post_path(post: Post) -> str:
@@ -72,6 +77,23 @@ def _canonical(path: str, config: SiteConfig) -> str:
     return f"{base}/{rel}"
 
 
+def _absolute_image_url(url: str, config: SiteConfig) -> str:
+    """Promote an image reference to the absolute URL og:image requires.
+
+    External (``http(s)://``), protocol-relative (``//``) and ``data:`` URLs are
+    already absolute enough for social scrapers and pass through. Site-relative
+    references (e.g. a resolved hero's ``/blog/assets/...`` public URL, which
+    already carries ``url_prefix``) are prefixed with the site *origin* —
+    scheme + host from ``site.base_url`` — not ``base_url`` itself, which would
+    duplicate the path prefix.
+    """
+    if url.startswith(("http://", "https://", "//", "data:")):
+        return url
+    parsed = urlparse(config.site.base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    return f"{origin}{url}" if url.startswith("/") else f"{origin}/{url}"
+
+
 def _base_context(ctx: PageContext, *, canonical_path: str) -> dict[str, Any]:
     return {
         "site": ctx.config.site,
@@ -81,19 +103,34 @@ def _base_context(ctx: PageContext, *, canonical_path: str) -> dict[str, Any]:
         "pygments_style": ctx.config.pygments_style,
         "url_prefix": ctx.config.url_prefix,
         "canonical_url": _canonical(canonical_path, ctx.config),
-        "og_image_url": None,
+        "og_image_url": (
+            _absolute_image_url(ctx.default_image_url, ctx.config)
+            if ctx.default_image_url is not None
+            else None
+        ),
+        "og_image_alt": None,
         "page": None,
         "stylesheets": ctx.stylesheets,
     }
+
+
+def _post_context(post: Post, body_html: str, ctx: PageContext, path: str) -> dict[str, Any]:
+    """Build the template context for a single-post page (published or draft)."""
+    view = _page_view(post, ctx.config, body_html)
+    context = _base_context(ctx, canonical_path=path)
+    context["page"] = view
+    # A post's own hero image wins over the site-wide default for og:image.
+    if view["image_url"] is not None:
+        context["og_image_url"] = _absolute_image_url(view["image_url"], ctx.config)
+        context["og_image_alt"] = view["image_alt"]
+    return context
 
 
 def render_post_page(post: Post, body_html: str, ctx: PageContext) -> OutputFile:
     """Render ``<slug>/index.html`` for a published post."""
     assert post.slug is not None
     path = _post_path(post)
-    view = _page_view(post, ctx.config, body_html)
-    context = _base_context(ctx, canonical_path=path)
-    context["page"] = view
+    context = _post_context(post, body_html, ctx, path)
     name = resolve_template_name("post", ctx.config)
     html = render_template(ctx.engine, name, context)
     return OutputFile(relative_path=f"{post.slug}/index.html", content=html)
@@ -104,9 +141,7 @@ def render_draft_page(post: Post, body_html: str, ctx: PageContext) -> OutputFil
     assert post.slug is not None
     token = hashlib.sha256(post.slug.encode("utf-8")).hexdigest()[:8]
     path = f"/_drafts/{token}-{post.slug}/"
-    view = _page_view(post, ctx.config, body_html)
-    context = _base_context(ctx, canonical_path=path)
-    context["page"] = view
+    context = _post_context(post, body_html, ctx, path)
     name = resolve_template_name("post", ctx.config)
     html = render_template(ctx.engine, name, context)
     return OutputFile(relative_path=f"_drafts/{token}-{post.slug}/index.html", content=html)

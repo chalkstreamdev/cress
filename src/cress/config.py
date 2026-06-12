@@ -7,7 +7,8 @@ Produces a frozen :class:`SiteConfig` — the single config handle passed around
 the rest of the pipeline.
 """
 
-from collections.abc import Callable, Iterable
+import os
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -229,16 +230,58 @@ def load_user_config(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
-def resolve_vault(cli_arg: Path | None, user_config: dict[str, Any]) -> Path:
-    """CLI arg wins; else ``user_config['vault']``; else raise."""
+def _site_config_vault(target: Path) -> str | None:
+    """Read the optional ``vault:`` key from ``<target>/.cress/config.yaml``.
+
+    Tolerant by design — a missing, unreadable, or malformed config returns
+    ``None`` so vault resolution can fall through to the next source. Genuine
+    config errors surface later from :func:`load_site_config`.
+    """
+    config_path = target / ".cress" / "config.yaml"
+    if not config_path.is_file():
+        return None
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        return None
+    vault = raw.get("vault")
+    return vault if isinstance(vault, str) else None
+
+
+def resolve_vault(
+    cli_arg: Path | None,
+    user_config: dict[str, Any],
+    target: Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Path:
+    """Resolve the vault path from the first available source.
+
+    Order: CLI ``--vault`` → ``vault:`` in the user config
+    (``~/.config/cress/config.yaml``) → ``vault:`` in the site config
+    (``<target>/.cress/config.yaml``) → the ``CRESS_VAULT`` environment
+    variable. The site-config source is what makes a synced-drive,
+    multi-machine setup zero-config: the vault path travels with the repo
+    instead of needing a per-user setup step on every machine. A site-config
+    vault given as a relative path is resolved against ``target``.
+    """
     if cli_arg is not None:
         return cli_arg
-    vault = user_config.get("vault")
-    if vault is None:
-        raise ConfigError(
-            "vault path not provided — pass --vault or set `vault:` in ~/.config/cress/config.yaml"
-        )
-    return Path(vault)
+    user_vault = user_config.get("vault")
+    if user_vault is not None:
+        return Path(user_vault)
+    if target is not None:
+        site_vault = _site_config_vault(target)
+        if site_vault is not None:
+            path = Path(site_vault)
+            return path if path.is_absolute() else (target / path).resolve()
+    environ = env if env is not None else os.environ
+    env_vault = environ.get("CRESS_VAULT")
+    if env_vault:
+        return Path(env_vault)
+    raise ConfigError(
+        "vault path not provided — pass --vault, set `vault:` in "
+        "~/.config/cress/config.yaml or in <target>/.cress/config.yaml, "
+        "or set the CRESS_VAULT environment variable"
+    )
 
 
 def _require_keys(data: dict[str, Any], keys: Iterable[str], parent: str) -> None:

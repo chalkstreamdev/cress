@@ -2,8 +2,8 @@
 
 Populated across the pipeline (wikilinks, attachments, taxonomy, shortcodes,
 plugins, etc.) and aggregated in the :class:`BuildResult` returned by
-:meth:`cress.cress.build`. Serialisable to the ``--json`` envelope defined
-in Task 18 with identical field names.
+:meth:`cress.cress.build`. Serialisable to the CLI's ``--json`` envelope with
+identical field names.
 """
 
 from dataclasses import dataclass

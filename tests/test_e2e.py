@@ -198,7 +198,8 @@ def test_e2e_full_build(fixture: tuple[Path, Path]) -> None:
 
     # 6: wikilinks render as links; tags merge inline+frontmatter
     hello_html = (out / "hello" / "index.html").read_text(encoding="utf-8")
-    assert '<a href="/chart-details/">' in hello_html
+    # base_url ends in /blog, so internal links carry the /blog url_prefix.
+    assert '<a href="/blog/chart-details/">' in hello_html
     assert "#details" in hello_html or "details" in hello_html
     assert "ml" in hello_html
     # Hashed asset URL present for hero.png (content hash in filename)

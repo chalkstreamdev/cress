@@ -249,6 +249,55 @@ def test_pagination_urls_include_prefix(tmp_path: Path) -> None:
     assert 'href="/blog/page/3/"' in c
 
 
+# --- og:image ------------------------------------------------------------
+
+
+def test_post_hero_og_image_is_absolute(ctx: PageContext) -> None:
+    """A site-relative resolved hero becomes an absolute og:image URL."""
+    post = _replace(_post("hello"), image="/blog/assets/hero/abc123.png", image_alt="Hero shot")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert (
+        'property="og:image" content="https://example.com/blog/assets/hero/abc123.png"' in content
+    )
+
+
+def test_post_hero_og_image_alt_rendered(ctx: PageContext) -> None:
+    post = _replace(_post("hello"), image="/blog/assets/hero/abc123.png", image_alt="Hero shot")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert 'property="og:image:alt" content="Hero shot"' in content
+
+
+def test_post_external_hero_og_image_passes_through(ctx: PageContext) -> None:
+    post = _replace(_post("hello"), image="https://cdn.example.com/x.png")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert 'property="og:image" content="https://cdn.example.com/x.png"' in content
+
+
+def test_default_image_og_is_absolute(site_config: SiteConfig) -> None:
+    """The ``site.default_image`` fallback (site-relative) is absolutized for og:image."""
+    engine = build_engine(site_config, PluginRegistry())
+    page_ctx = PageContext(
+        config=site_config,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+        default_image_url="/blog/assets/_site/default.png",
+    )
+    post = _post("hello")  # no per-post hero
+    out = render_post_page(post, "<p>body</p>", page_ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert (
+        'property="og:image" content="https://example.com/blog/assets/_site/default.png"' in content
+    )
+
+
 # --- stylesheet wiring ---------------------------------------------------
 
 

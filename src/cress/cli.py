@@ -26,9 +26,9 @@ app: typer.Typer = typer.Typer(
 )
 
 
-def _resolve_vault_option(vault_opt: Path | None) -> Path:
+def _resolve_vault_option(vault_opt: Path | None, target: Path) -> Path:
     user_config = load_user_config()
-    return resolve_vault(vault_opt, user_config)
+    return resolve_vault(vault_opt, user_config, target=target)
 
 
 def _json_envelope(
@@ -55,6 +55,22 @@ def _build_result_to_dict(result: BuildResult) -> dict[str, Any]:
     }
 
 
+def _emit_hard_error(exc: CressError, *, json_output: bool) -> typer.Exit:
+    """Render a ``CressError`` for the user and return a non-zero ``typer.Exit``."""
+    if json_output:
+        typer.echo(
+            _json_envelope(
+                ok=False,
+                result={},
+                warnings=[],
+                errors=[BuildWarning(type=type(exc).__name__, file="", message=str(exc))],
+            )
+        )
+    else:
+        typer.echo(f"error: {exc}", err=True)
+    return typer.Exit(code=1)
+
+
 @app.command()
 def build(
     target: Annotated[
@@ -67,24 +83,11 @@ def build(
 ) -> None:
     """Build the site into the target repo's output directory."""
     try:
-        resolved_vault = _resolve_vault_option(vault)
+        resolved_vault = _resolve_vault_option(vault, target)
         site = cress(resolved_vault, target)
         result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
     except CressError as exc:
-        # TODO refactor this duplication - 5 places
-        # Hard errors: exit non-zero.
-        if json_output:
-            typer.echo(
-                _json_envelope(
-                    ok=False,
-                    result={},
-                    warnings=[],
-                    errors=[BuildWarning(type=type(exc).__name__, file="", message=str(exc))],
-                )
-            )
-        else:
-            typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise _emit_hard_error(exc, json_output=json_output) from exc
 
     ok = not result.errors
     if json_output:
@@ -116,22 +119,11 @@ def validate(
 ) -> None:
     """Dry-run parse every post and report issues."""
     try:
-        resolved_vault = _resolve_vault_option(vault)
+        resolved_vault = _resolve_vault_option(vault, target)
         site = cress(resolved_vault, target)
         issues = _run_validate(site, fix=fix)
     except CressError as exc:
-        if json_output:
-            typer.echo(
-                _json_envelope(
-                    ok=False,
-                    result={},
-                    warnings=[],
-                    errors=[BuildWarning(type=type(exc).__name__, file="", message=str(exc))],
-                )
-            )
-        else:
-            typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise _emit_hard_error(exc, json_output=json_output) from exc
 
     ok = not issues
     if json_output:
@@ -163,11 +155,10 @@ def serve(
     from cress.server import serve as _serve
 
     try:
-        resolved_vault = _resolve_vault_option(vault)
+        resolved_vault = _resolve_vault_option(vault, target)
         site = cress(resolved_vault, target)
     except CressError as exc:
-        typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise _emit_hard_error(exc, json_output=json_output) from exc
 
     _serve(
         site,
@@ -193,25 +184,14 @@ def publish(
     from cress.publish import commit_outputs
 
     try:
-        resolved_vault = _resolve_vault_option(vault)
+        resolved_vault = _resolve_vault_option(vault, target)
         site = cress(resolved_vault, target)
         result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
         commit = commit_outputs(
             site.target, site.config.output_dir, site.config, result.pages_written
         )
     except CressError as exc:
-        if json_output:
-            typer.echo(
-                _json_envelope(
-                    ok=False,
-                    result={},
-                    warnings=[],
-                    errors=[BuildWarning(type=type(exc).__name__, file="", message=str(exc))],
-                )
-            )
-        else:
-            typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise _emit_hard_error(exc, json_output=json_output) from exc
 
     warnings = list(result.warnings)
     if commit.push_error:

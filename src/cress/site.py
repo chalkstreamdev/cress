@@ -68,7 +68,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         self.config: SiteConfig = load_site_config(target)
 
     def build(self, drafts_only: bool = False, no_drafts: bool = False) -> BuildResult:
-        """Run the full build pipeline. See the plan's Task 16 for ordering details."""
+        """Run the full build pipeline (steps numbered inline below)."""
         started = time.perf_counter()
         warnings: list[BuildWarning] = []
         errors: list[BuildWarning] = []
@@ -211,6 +211,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
             now=datetime.now(),
             cress_version=_version(),
             stylesheets=tuple(resolve_stylesheets(self.config)),
+            default_image_url=og_image_url,
         )
         page_outputs: list[OutputFile] = []
         for post, body_html in posts_with_html:
@@ -265,10 +266,6 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
 
         # Step 17: after_build hook.
         self._fire_hook(registry, "after_build", [result])
-        # The OG image URL is stashed for future use by a plugin-aware page
-        # context; it's collected here rather than earlier because page
-        # generators currently don't consume it. Guarding against removal.
-        _ = og_image_url
         return result
 
     # -- helpers ------------------------------------------------------------

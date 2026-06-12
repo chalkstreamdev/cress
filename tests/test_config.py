@@ -208,8 +208,46 @@ def test_resolve_vault_user_config_used_when_no_cli_arg() -> None:
 
 def test_resolve_vault_raises_when_neither_provided() -> None:
     with pytest.raises(ConfigError) as exc:
-        resolve_vault(None, {})
+        resolve_vault(None, {}, env={})
     assert "vault" in str(exc.value).lower()
+
+
+def test_resolve_vault_user_config_wins_over_site_config(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG + 'vault: "/site/vault"\n')
+    vault = resolve_vault(None, {"vault": "/user/vault"}, target=tmp_path, env={})
+    assert vault == Path("/user/vault")
+
+
+def test_resolve_vault_site_config_used_when_no_cli_or_user(tmp_path: Path) -> None:
+    abs_vault = (tmp_path / "site-vault").as_posix()
+    _write_config(tmp_path, MINIMAL_CONFIG + f'vault: "{abs_vault}"\n')
+    vault = resolve_vault(None, {}, target=tmp_path, env={})
+    assert vault == Path(abs_vault)
+
+
+def test_resolve_vault_site_config_relative_resolves_against_target(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG + 'vault: "../vault"\n')
+    vault = resolve_vault(None, {}, target=tmp_path, env={})
+    assert vault == (tmp_path / ".." / "vault").resolve()
+
+
+def test_resolve_vault_env_var_used_as_last_resort(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG)  # no vault key
+    vault = resolve_vault(None, {}, target=tmp_path, env={"CRESS_VAULT": "/env/vault"})
+    assert vault == Path("/env/vault")
+
+
+def test_resolve_vault_site_config_wins_over_env(tmp_path: Path) -> None:
+    abs_vault = (tmp_path / "site-vault").as_posix()
+    _write_config(tmp_path, MINIMAL_CONFIG + f'vault: "{abs_vault}"\n')
+    vault = resolve_vault(None, {}, target=tmp_path, env={"CRESS_VAULT": "/env/vault"})
+    assert vault == Path(abs_vault)
+
+
+def test_resolve_vault_missing_site_config_falls_through_to_env(tmp_path: Path) -> None:
+    # No .cress/config.yaml at all — should not raise, just fall through.
+    vault = resolve_vault(None, {}, target=tmp_path, env={"CRESS_VAULT": "/env/vault"})
+    assert vault == Path("/env/vault")
 
 
 # --- stylesheet wiring --------------------------------------------------

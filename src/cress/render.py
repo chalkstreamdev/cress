@@ -3,11 +3,11 @@
 Two responsibilities:
 
 * Markdown → HTML via mistune 3 with cress-specific plugins (wikilinks,
-  embeds, shortcodes, heading anchors, pygments highlighting). See Task 5.
+  embeds, shortcodes, heading anchors, pygments highlighting).
 * Django template engine setup (standalone, no ORM, no settings module).
   A fresh :class:`~django.template.Engine` is built per :meth:`cress.build`
   call so template filters/globals registered by plugins don't leak across
-  builds. See Task 9.
+  builds.
 """
 
 import base64
@@ -46,8 +46,8 @@ _EMBED_PATTERN = r"!\[\[(?P<embed_target>[^\]\n|]+?)(?:\|(?P<embed_alias>[^\]\n]
 class RenderContext:
     """Per-build render configuration.
 
-    ``shortcode_names`` comes from the shortcode registry (Task 13); in Task 5
-    we only need the name set for dispatch-decision in ``block_code``.
+    ``shortcode_names`` comes from the shortcode registry; markdown rendering
+    only needs the name set to decide dispatch in ``block_code``.
     """
 
     shortcode_names: set[str] = field(default_factory=set)
@@ -141,9 +141,10 @@ def _build_parser(ctx: RenderContext) -> Markdown:
 def render_markdown_text(source: str, ctx: RenderContext) -> str:
     """Render a markdown body to HTML with cress placeholders.
 
-    Wikilinks and embeds are left as ``data-cress-*`` placeholders for Tasks 6/7
-    to resolve; shortcodes are emitted as ``<div data-cress-shortcode>`` for
-    Task 13. Heading ids and pygments highlighting happen here.
+    Wikilinks and embeds are left as ``data-cress-*`` placeholders for the
+    later wikilink/embed substitution passes to resolve; shortcodes are emitted
+    as ``<div data-cress-shortcode>`` for the shortcode substitution pass.
+    Heading ids and pygments highlighting happen here.
     """
     result = _build_parser(ctx)(source)
     assert isinstance(result, str)
