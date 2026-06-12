@@ -90,9 +90,7 @@ def test_resolve_attachment_not_found(vault: Path, site_config: SiteConfig) -> N
     assert resolve_attachment("ghost.png", post, site_config, vault) is None
 
 
-def test_plan_attachment_produces_hashed_output_file(
-    vault: Path, site_config: SiteConfig
-) -> None:
+def test_plan_attachment_produces_hashed_output_file(vault: Path, site_config: SiteConfig) -> None:
     src = vault / "_attachments" / "hero.png"
     src.write_bytes(b"hello")
     plan = plan_attachment(src, "post-slug", site_config)
@@ -157,8 +155,7 @@ def test_substitute_embeds_image_alias_becomes_alt(
     src.write_bytes(b"png-bytes")
     post = _make_post(vault, "hello")
     html = (
-        '<span data-cress-embed="hero.png"'
-        ' data-cress-embed-alias="Board after the blitz"></span>'
+        '<span data-cress-embed="hero.png" data-cress-embed-alias="Board after the blitz"></span>'
     )
     warnings: list[BuildWarning] = []
     out: list[OutputFile] = []
@@ -288,10 +285,7 @@ def test_same_attachment_twice_single_copy(
     src = vault / "_attachments" / "hero.png"
     src.write_bytes(b"once")
     post = _make_post(vault, "hello")
-    html = (
-        '<span data-cress-embed="hero.png"></span>'
-        '<span data-cress-embed="hero.png"></span>'
-    )
+    html = '<span data-cress-embed="hero.png"></span><span data-cress-embed="hero.png"></span>'
     warnings: list[BuildWarning] = []
     out: list[OutputFile] = []
     substitute_embeds(
@@ -346,7 +340,7 @@ def test_markdown_transclusion_depth_1_refuses_further_nesting(
     vault: Path, site_config: SiteConfig, render_ctx: RenderContext
 ) -> None:
     inner_path = vault / "Blogs" / "Demo" / "inner.md"
-    inner_body = 'Deep ![[even-deeper.md]] here.'
+    inner_body = "Deep ![[even-deeper.md]] here."
     inner = Post(
         source_path=inner_path,
         title="Inner",
@@ -368,9 +362,7 @@ def test_markdown_transclusion_depth_1_refuses_further_nesting(
         frontmatter_raw={},
         slug="even-deeper",
     )
-    deeper_path.write_text(
-        "---\ntitle: Deeper\ndate: 2026-04-21\n---\ndeepest", encoding="utf-8"
-    )
+    deeper_path.write_text("---\ntitle: Deeper\ndate: 2026-04-21\n---\ndeepest", encoding="utf-8")
 
     post = _make_post(vault, "hello")
     html = '<span data-cress-embed="inner.md"></span>'

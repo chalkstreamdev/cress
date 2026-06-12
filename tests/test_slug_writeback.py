@@ -177,9 +177,10 @@ def test_apply_writeback_preserves_quirky_frontmatter(
     assert fm_after[: len(fm_before)] == fm_before
 
     # Body unchanged.
-    assert after[after.index("\n---\n", after_open) + len("\n---\n") :] == original[
-        original.index("\n---\n", before_open) + len("\n---\n") :
-    ]
+    assert (
+        after[after.index("\n---\n", after_open) + len("\n---\n") :]
+        == original[original.index("\n---\n", before_open) + len("\n---\n") :]
+    )
 
 
 def test_apply_writeback_is_noop_for_posts_with_existing_slug(
@@ -212,7 +213,7 @@ def test_apply_writeback_does_not_touch_files_when_duplicates_present(
 
 def test_apply_writeback_non_ascii_title(tmp_path: Path, site_config: SiteConfig) -> None:
     path = tmp_path / "unicode.md"
-    original = "---\ntitle: \"Café Résumé\"\ndate: 2026-04-19\n---\nbody\n"
+    original = '---\ntitle: "Café Résumé"\ndate: 2026-04-19\n---\nbody\n'
     path.write_text(original, encoding="utf-8")
     plan = plan_slug_writebacks([parse_post(path, site_config)])
     apply_slug_writebacks(plan)

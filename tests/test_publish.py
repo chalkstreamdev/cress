@@ -132,9 +132,7 @@ def test_push_failure_captures_error_as_warning_not_raise(tmp_path: Path) -> Non
         raise GitCommandError("push", 128, b"", b"auth denied")
 
     with mock.patch("git.Remote.push", side_effect=_raise):
-        commit = commit_outputs(
-            target, site.config.output_dir, site.config, result.pages_written
-        )
+        commit = commit_outputs(target, site.config.output_dir, site.config, result.pages_written)
     assert commit.changed is True
     assert commit.pushed is False
     assert commit.push_error is not None

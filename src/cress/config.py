@@ -178,8 +178,7 @@ def load_site_config(target: Path) -> SiteConfig:
     if not isinstance(extra_stylesheets_raw, list):
         raise ConfigError("extra_stylesheets: must be a list")
     extra_stylesheets = tuple(
-        _as_str(item, f"extra_stylesheets[{idx}]")
-        for idx, item in enumerate(extra_stylesheets_raw)
+        _as_str(item, f"extra_stylesheets[{idx}]") for idx, item in enumerate(extra_stylesheets_raw)
     )
 
     return SiteConfig(

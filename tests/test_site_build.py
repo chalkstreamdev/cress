@@ -108,9 +108,7 @@ def test_no_drafts_excludes_drafts(tmp_path: Path) -> None:
     vault, target = _set_up_fixture(
         tmp_path,
         extra_posts={
-            "secret.md": (
-                "---\ntitle: Secret\nslug: secret\ndate: 2026-04-20\ndraft: true\n---\n"
-            ),
+            "secret.md": ("---\ntitle: Secret\nslug: secret\ndate: 2026-04-20\ndraft: true\n---\n"),
         },
     )
     cress(vault, target).build(no_drafts=True)
@@ -202,12 +200,7 @@ def test_hero_image_is_routed_through_attachment_pipeline(tmp_path: Path) -> Non
     vault, target = _set_up_fixture(tmp_path)
     (vault / "_attachments" / "hero.png").write_bytes(b"hero-bytes")
     (vault / "Blogs/Demo" / "with-hero.md").write_text(
-        "---\n"
-        "title: With Hero\n"
-        "slug: with-hero\n"
-        "date: 2026-04-19\n"
-        "image: hero.png\n"
-        "---\nBody.\n",
+        "---\ntitle: With Hero\nslug: with-hero\ndate: 2026-04-19\nimage: hero.png\n---\nBody.\n",
         encoding="utf-8",
     )
     result = cress(vault, target).build()

@@ -276,9 +276,7 @@ Discussing #ml here.
     assert post.tags.count("ml") == 1
 
 
-def test_hashtag_inside_fenced_code_block_ignored(
-    tmp_path: Path, site_config: SiteConfig
-) -> None:
+def test_hashtag_inside_fenced_code_block_ignored(tmp_path: Path, site_config: SiteConfig) -> None:
     path = _write_post(
         tmp_path,
         "code.md",

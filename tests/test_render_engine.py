@@ -119,9 +119,7 @@ def test_template_filter_isolated_per_engine(site_config: SiteConfig) -> None:
 
     registry_with = PluginRegistry(template_filters={"shout": shout})
     engine_with = build_engine(site_config, registry_with)
-    assert (
-        engine_with.from_string("{{ s|shout }}").render(Context({"s": "hi"})) == "HI"
-    )
+    assert engine_with.from_string("{{ s|shout }}").render(Context({"s": "hi"})) == "HI"
 
     # A fresh engine built with an empty registry does NOT see the filter.
     registry_without = PluginRegistry()

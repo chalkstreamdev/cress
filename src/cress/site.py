@@ -131,8 +131,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
 
         # Step 7: partition drafts / published and apply filters.
         filtered = [
-            p for p in posts
-            if (not no_drafts or not p.draft) and (not drafts_only or p.draft)
+            p for p in posts if (not no_drafts or not p.draft) and (not drafts_only or p.draft)
         ]
         if not filtered:
             warnings.append(
@@ -151,9 +150,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         # resolved ``Post.image`` — otherwise the tag page renders post cards
         # with the raw frontmatter filename.
         attachment_outputs: list[OutputFile] = []
-        filtered = [
-            self._resolve_hero_image(p, attachment_outputs, warnings) for p in filtered
-        ]
+        filtered = [self._resolve_hero_image(p, attachment_outputs, warnings) for p in filtered]
 
         # Step 10: taxonomies (use the hero-resolved posts).
         tag_tax = Taxonomy()
@@ -165,9 +162,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
                 cat_tax.add(cat, post, warnings)
 
         # Step 11: site default image.
-        og_image_url: str | None = self._resolve_default_image(
-            attachment_outputs, warnings
-        )
+        og_image_url: str | None = self._resolve_default_image(attachment_outputs, warnings)
 
         # Step 12: per-post render loop.
         render_ctx = RenderContext(
@@ -330,9 +325,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
             attachment_outputs.append(plan.output_file)
         return plan.public_url
 
-    def _build_shortcode_registry(
-        self, registry: PluginRegistry, engine: Any
-    ) -> ShortcodeRegistry:
+    def _build_shortcode_registry(self, registry: PluginRegistry, engine: Any) -> ShortcodeRegistry:
         sc = ShortcodeRegistry()
         # Template-only shortcodes declared in config.
         for name, template_path in self.config.shortcodes.items():
@@ -352,9 +345,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         for fn in registry.hooks.get(name, []):
             fn(*args)
 
-    def _fire_hook_with_return(
-        self, registry: PluginRegistry, name: str, args: list[Any]
-    ) -> Any:
+    def _fire_hook_with_return(self, registry: PluginRegistry, name: str, args: list[Any]) -> Any:
         last_return: Any = None
         for fn in registry.hooks.get(name, []):
             result = fn(*args)

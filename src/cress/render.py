@@ -112,9 +112,7 @@ def _parse_cress_wikilink(inline: InlineParser, m: Match[str], state: InlineStat
     del inline
     target = m.group("wikilink_target")
     alias = m.group("wikilink_alias") or ""
-    state.append_token(
-        {"type": "cress_wikilink", "attrs": {"target": target, "alias": alias}}
-    )
+    state.append_token({"type": "cress_wikilink", "attrs": {"target": target, "alias": alias}})
     return m.end()
 
 
@@ -125,9 +123,7 @@ def _plugin_cress_embed(md: Markdown) -> None:
 
 
 def _plugin_cress_wikilink(md: Markdown) -> None:
-    md.inline.register(
-        "cress_wikilink", _WIKILINK_PATTERN, _parse_cress_wikilink, before="link"
-    )
+    md.inline.register("cress_wikilink", _WIKILINK_PATTERN, _parse_cress_wikilink, before="link")
 
 
 def _build_parser(ctx: RenderContext) -> Markdown:

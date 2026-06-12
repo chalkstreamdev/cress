@@ -67,9 +67,7 @@ def test_cli_build_json_shape(fixture: tuple[Path, Path]) -> None:
         "---\ntitle: A\nslug: a\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8"
     )
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["build", "--vault", str(vault), "--target", str(target), "--json"]
-    )
+    result = runner.invoke(app, ["build", "--vault", str(vault), "--target", str(target), "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["version"] == 1
@@ -108,9 +106,7 @@ def test_cli_validate_fix_writes_slug_and_returns_zero(
 ) -> None:
     vault, target = fixture
     src = vault / "Blogs/Demo/a.md"
-    src.write_text(
-        "---\ntitle: Hello World\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8"
-    )
+    src.write_text("---\ntitle: Hello World\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         app, ["validate", "--fix", "--vault", str(vault), "--target", str(target)]
@@ -123,9 +119,7 @@ def test_cli_validate_fix_writes_slug_and_returns_zero(
 def test_cli_validate_fix_json(fixture: tuple[Path, Path]) -> None:
     vault, target = fixture
     src = vault / "Blogs/Demo/a.md"
-    src.write_text(
-        "---\ntitle: Hello World\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8"
-    )
+    src.write_text("---\ntitle: Hello World\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         app,

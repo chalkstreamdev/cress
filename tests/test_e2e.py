@@ -116,7 +116,7 @@ def fixture(tmp_path: Path) -> tuple[Path, Path]:
         encoding="utf-8",
     )
     (posts / "cafe.md").write_text(
-        "---\ntitle: Café\nslug: cafe\ndate: 2026-04-14\ntags: [\"Café\"]\n---\n"
+        '---\ntitle: Café\nslug: cafe\ndate: 2026-04-14\ntags: ["Café"]\n---\n'
         "Diacritic taxonomy test.\n",
         encoding="utf-8",
     )
@@ -140,8 +140,7 @@ def fixture(tmp_path: Path) -> tuple[Path, Path]:
         encoding="utf-8",
     )
     (posts / "p6.md").write_text(
-        "---\ntitle: Post Six\nslug: p6\ndate: 2026-04-19\n"
-        "categories: [product]\n---\nbody\n",
+        "---\ntitle: Post Six\nslug: p6\ndate: 2026-04-19\ncategories: [product]\n---\nbody\n",
         encoding="utf-8",
     )
     return vault, target

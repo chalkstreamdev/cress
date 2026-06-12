@@ -40,6 +40,7 @@ class ShortcodeRegistry:
 
     def register_template(self, name: str, template_path: str, engine: Engine) -> None:
         """Register ``name`` to render via a Django template with YAML body as context."""
+
         def handler(body: str, **ctx: Any) -> str:
             del ctx  # template shortcodes receive only the YAML body as context
             data = yaml.safe_load(body) or {}

@@ -172,9 +172,7 @@ def test_deduplicates_css_shared_between_entries(tmp_path: Path) -> None:
         ("/app", "/app/assets/x.css"),
     ],
 )
-def test_asset_prefix_applied_single_slash(
-    tmp_path: Path, prefix: str, expected: str
-) -> None:
+def test_asset_prefix_applied_single_slash(tmp_path: Path, prefix: str, expected: str) -> None:
     manifest = _write_manifest(
         tmp_path / "manifest.json",
         {

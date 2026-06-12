@@ -243,9 +243,7 @@ def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
         try:
             posts.append(parse_post(md, site.config))
         except PostParseError as exc:
-            issues.append(
-                BuildWarning(type="post_parse_error", file=str(md), message=str(exc))
-            )
+            issues.append(BuildWarning(type="post_parse_error", file=str(md), message=str(exc)))
 
     if not posts:
         return issues

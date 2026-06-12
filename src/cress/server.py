@@ -143,7 +143,7 @@ def _make_handler(
                 self.path = "/"
                 return True
             if self.path.startswith(f"{url_prefix}/"):
-                self.path = self.path[len(url_prefix):]
+                self.path = self.path[len(url_prefix) :]
                 return True
             if site_root is not None:
                 rel = self.path.split("?", 1)[0].split("#", 1)[0].lstrip("/")
@@ -237,9 +237,7 @@ def serve(
     _emit_build(result, json_output)
 
     bus = _ReloadBus()
-    handler_cls = _make_handler(
-        site.config.output_dir, live_reload, bus, site.config.url_prefix
-    )
+    handler_cls = _make_handler(site.config.output_dir, live_reload, bus, site.config.url_prefix)
     server = ThreadingHTTPServer(("127.0.0.1", port), handler_cls)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()

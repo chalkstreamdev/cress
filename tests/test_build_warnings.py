@@ -43,12 +43,7 @@ def _base(tmp_path: Path, posts: dict[str, str]) -> tuple[Path, Path]:
 def test_unresolvable_wikilink_warning(tmp_path: Path) -> None:
     vault, target = _base(
         tmp_path,
-        {
-            "a.md": (
-                "---\ntitle: A\nslug: a\ndate: 2026-04-19\n---\n"
-                "Here [[nonexistent]] goes.\n"
-            )
-        },
+        {"a.md": ("---\ntitle: A\nslug: a\ndate: 2026-04-19\n---\nHere [[nonexistent]] goes.\n")},
     )
     result = cress(vault, target).build()
     assert any(w.type == "broken_wikilink" for w in result.warnings)
@@ -203,11 +198,7 @@ def test_drafts_only_with_no_drafts_is_soft(tmp_path: Path) -> None:
 def test_no_drafts_when_only_drafts_is_soft(tmp_path: Path) -> None:
     vault, target = _base(
         tmp_path,
-        {
-            "a.md": (
-                "---\ntitle: A\nslug: a\ndate: 2026-04-19\ndraft: true\n---\nbody\n"
-            )
-        },
+        {"a.md": ("---\ntitle: A\nslug: a\ndate: 2026-04-19\ndraft: true\n---\nbody\n")},
     )
     result = cress(vault, target).build(no_drafts=True)
     assert result.errors == []

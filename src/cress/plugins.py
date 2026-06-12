@@ -99,27 +99,21 @@ class _PluginSingleton:
 
         return decorator
 
-    def template_filter(
-        self, name: str
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def template_filter(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._bucket().template_filters[name] = func
             return func
 
         return decorator
 
-    def template_global(
-        self, name: str
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def template_global(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._bucket().template_globals[name] = func
             return func
 
         return decorator
 
-    def hook(
-        self, name: str
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def hook(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         if name not in _VALID_HOOK_NAMES:
             raise ValueError(f"unknown hook {name!r}; valid: {sorted(_VALID_HOOK_NAMES)}")
 
@@ -129,9 +123,7 @@ class _PluginSingleton:
 
         return decorator
 
-    def inline(
-        self, pattern: str
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def inline(self, pattern: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._bucket().inline_patterns.append((pattern, func))
             return func

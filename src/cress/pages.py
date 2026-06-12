@@ -151,9 +151,7 @@ def render_index_pages(
     posts_with_html: list[tuple[Post, str]], ctx: PageContext
 ) -> list[OutputFile]:
     """Render reverse-chronological paginated ``/index.html`` + ``/page/N/index.html``."""
-    published = [
-        (p, body) for p, body in posts_with_html if not p.draft and p.slug is not None
-    ]
+    published = [(p, body) for p, body in posts_with_html if not p.draft and p.slug is not None]
     published.sort(key=lambda item: item[0].date, reverse=True)
     return _paginate(
         items=[_page_view(p, ctx.config, body) for p, body in published],

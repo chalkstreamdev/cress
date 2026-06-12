@@ -86,9 +86,7 @@ def read_vite_css_hrefs(manifest_path: Path, asset_prefix: str = "/") -> list[st
     return hrefs
 
 
-def _collect_chunk_css(
-    manifest: dict[str, Any], chunk_key: str, *, visited: set[str]
-) -> list[str]:
+def _collect_chunk_css(manifest: dict[str, Any], chunk_key: str, *, visited: set[str]) -> list[str]:
     """Yield CSS paths for ``chunk_key`` and every chunk it transitively imports."""
     if chunk_key in visited:
         return []
