@@ -1,0 +1,5 @@
+<nav class="pagination">
+{% if pagination.prev_url %}<a rel="prev" href="{{ pagination.prev_url }}">&larr; prev</a>{% endif %}
+<span>page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+{% if pagination.next_url %}<a rel="next" href="{{ pagination.next_url }}">next &rarr;</a>{% endif %}
+</nav>

@@ -1,0 +1,12 @@
+{
+  "src/main.ts": {
+    "file": "assets/main-abc123.js",
+    "isEntry": true,
+    "css": ["assets/main-abc123.css"],
+    "imports": ["_chunk-shared.js"]
+  },
+  "_chunk-shared.js": {
+    "file": "assets/chunk-shared-def456.js",
+    "css": ["assets/chunk-shared-def456.css"]
+  }
+}

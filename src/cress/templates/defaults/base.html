@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="{{ site.locale|slice:":2" }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site.title }}{% endblock %}</title>
+{% block meta %}{% include "defaults/_meta.html" %}{% endblock %}
+{% if features.syntax_highlighting %}<link rel="stylesheet" href="/assets/pygments-{{ pygments_style }}.css">{% endif %}
+{% for sheet in stylesheets %}<link rel="stylesheet" href="{{ sheet }}">
+{% endfor %}{% block extra_head %}{% endblock %}
+</head>
+<body>
+<header><a href="/"><strong>{{ site.title }}</strong></a></header>
+<main>{% block content %}{% endblock %}</main>
+<footer>{% block footer %}<small>&copy; {{ now|date:"Y" }} {{ site.title }}</small>{% endblock %}</footer>
+</body>
+</html>

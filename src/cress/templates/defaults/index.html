@@ -1,0 +1,7 @@
+{% extends "defaults/base.html" %}
+{% block content %}
+<h1>{{ site.title }}</h1>
+<p>{{ site.description }}</p>
+{% for post in posts %}{% include "defaults/_post_card.html" %}{% endfor %}
+{% if pagination.total_pages > 1 %}{% include "defaults/_pagination.html" %}{% endif %}
+{% endblock %}

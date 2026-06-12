@@ -1,0 +1,7 @@
+{% extends "defaults/base.html" %}
+{% block title %}Tag: {{ display }} — {{ site.title }}{% endblock %}
+{% block content %}
+<h1>Tag: {{ display }}</h1>
+{% for post in posts %}{% include "defaults/_post_card.html" %}{% endfor %}
+{% if pagination.total_pages > 1 %}{% include "defaults/_pagination.html" %}{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+vault_subfolder: "Blogs/Demo"
+output_dir: "public/blog"
+
+site:
+  title: "Vite Manifest Demo"
+  description: "Stylesheet wiring fixture"
+  base_url: "https://demo.example.com/blog"
+
+vite_manifest: "fake-dist/.vite/manifest.json"
+vite_asset_prefix: "/"
+
+extra_stylesheets:
+  - "https://fonts.example.com/inter.css"
+
+features:
+  rss: false
+  sitemap: false
+  syntax_highlighting: false

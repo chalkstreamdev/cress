@@ -1,0 +1,20 @@
+{% extends "defaults/base.html" %}
+{% block title %}{{ page.title }} — {{ site.title }}{% endblock %}
+{% block content %}
+<article>
+  <h1>{{ page.title }}</h1>
+  <p><small>
+    <time datetime="{{ page.date|date:'c' }}">{{ page.date|date:"Y-m-d" }}</time>
+    · {{ page.author }}
+    · {{ page.reading_time_minutes }} min read
+    {% if page.updated %}· updated <time datetime="{{ page.updated|date:'c' }}">{{ page.updated|date:"Y-m-d" }}</time>{% endif %}
+  </small></p>
+  {% if page.categories %}<p>Categories:
+    {% for cat in page.categories %}<a href="{{ url_prefix }}/category/{{ cat|slugify }}/">{{ cat }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+  </p>{% endif %}
+  <div class="post-body">{{ page.html|safe }}</div>
+  {% if page.tags %}<p>Tags:
+    {% for tag in page.tags %}<a href="{{ url_prefix }}/tag/{{ tag|slugify }}/">#{{ tag }}</a>{% if not forloop.last %} {% endif %}{% endfor %}
+  </p>{% endif %}
+</article>
+{% endblock %}

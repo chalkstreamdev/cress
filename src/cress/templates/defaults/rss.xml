@@ -1,0 +1,2 @@
+{# RSS is rendered via feedgen in Python (cress.feeds). This stub exists only
+   so consumers who grep the template dir find the name. #}

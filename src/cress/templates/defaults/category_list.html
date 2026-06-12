@@ -1,0 +1,8 @@
+{% extends "defaults/base.html" %}
+{% block title %}Categories — {{ site.title }}{% endblock %}
+{% block content %}
+<h1>Categories</h1>
+<ul>
+{% for slug, display, count in entries %}<li><a href="{{ url_prefix }}/category/{{ slug }}/">{{ display }}</a> ({{ count }})</li>{% endfor %}
+</ul>
+{% endblock %}
