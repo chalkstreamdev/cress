@@ -16,6 +16,7 @@ from cress.server import (
     _emit_serve_url,
     _enumerate_routes,
     _make_handler,
+    _QuietHTTPServer,
     _ReloadBus,
     inject_live_reload,
 )
@@ -182,6 +183,43 @@ def test_http_handler_logs_requests_to_stderr(
     err = capfd.readouterr().err
     assert "GET / → 200" in err
     assert "GET /nope → 404" in err
+
+
+def test_quiet_server_suppresses_client_disconnect_traceback(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Browsers abort speculative/keep-alive connections; socketserver's
+    # handle_error would print a full traceback for each one. _QuietHTTPServer
+    # swallows ConnectionError (incl. Windows' ConnectionAbortedError 10053).
+    from http.server import SimpleHTTPRequestHandler
+
+    server = _QuietHTTPServer(("127.0.0.1", 0), SimpleHTTPRequestHandler, bind_and_activate=False)
+    try:
+        try:
+            raise ConnectionAbortedError(10053, "aborted by host machine")
+        except ConnectionAbortedError:
+            server.handle_error(None, ("127.0.0.1", 60505))
+    finally:
+        server.server_close()
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "Traceback" not in captured.out
+
+
+def test_quiet_server_still_reports_non_connection_errors(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from http.server import SimpleHTTPRequestHandler
+
+    server = _QuietHTTPServer(("127.0.0.1", 0), SimpleHTTPRequestHandler, bind_and_activate=False)
+    try:
+        try:
+            raise ValueError("genuine handler bug")
+        except ValueError:
+            server.handle_error(None, ("127.0.0.1", 60505))
+    finally:
+        server.server_close()
+    assert "ValueError" in capsys.readouterr().err
 
 
 def test_http_handler_with_url_prefix_falls_back_to_site_root_files(tmp_path: Path) -> None:

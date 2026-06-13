@@ -38,6 +38,22 @@ _LIVE_RELOAD_SCRIPT = """
 _DEBOUNCE_SECONDS = 0.25
 
 
+class _QuietHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that doesn't print tracebacks for client disconnects.
+
+    Browsers open speculative and keep-alive connections and abort them freely
+    (tab close, reload, unused pre-opened sockets). The stdlib's
+    ``handle_error`` prints a 20-line traceback for every one — on Windows as
+    ``ConnectionAbortedError`` (WinError 10053). Those are routine, not
+    server errors; anything else still gets the full report.
+    """
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        if isinstance(sys.exception(), ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
+
 class _ReloadBus:
     """Thread-safe broadcaster for rebuild notifications.
 
@@ -238,7 +254,7 @@ def serve(
 
     bus = _ReloadBus()
     handler_cls = _make_handler(site.config.output_dir, live_reload, bus, site.config.url_prefix)
-    server = ThreadingHTTPServer(("127.0.0.1", port), handler_cls)
+    server = _QuietHTTPServer(("127.0.0.1", port), handler_cls)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     _emit_serve_url(port, site.config.url_prefix, json_output)
