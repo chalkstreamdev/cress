@@ -254,24 +254,25 @@ def resolve_vault(
 ) -> Path:
     """Resolve the vault path from the first available source.
 
-    Order: CLI ``--vault`` → ``vault:`` in the user config
-    (``~/.config/cress/config.yaml``) → ``vault:`` in the site config
-    (``<target>/.cress/config.yaml``) → the ``CRESS_VAULT`` environment
-    variable. The site-config source is what makes a synced-drive,
-    multi-machine setup zero-config: the vault path travels with the repo
-    instead of needing a per-user setup step on every machine. A site-config
-    vault given as a relative path is resolved against ``target``.
+    Order: CLI ``--vault`` → ``vault:`` in the site config
+    (``<target>/.cress/config.yaml``) → ``vault:`` in the user config
+    (``~/.config/cress/config.yaml``) → the ``CRESS_VAULT`` environment
+    variable. Most-specific wins: a project that declares its own vault
+    (e.g. an in-repo content folder) beats the user's global default vault,
+    and the vault path travels with the repo — a synced-drive, multi-machine
+    setup needs no per-user setup step. A site-config vault given as a
+    relative path is resolved against ``target``.
     """
     if cli_arg is not None:
         return cli_arg
-    user_vault = user_config.get("vault")
-    if user_vault is not None:
-        return Path(user_vault)
     if target is not None:
         site_vault = _site_config_vault(target)
         if site_vault is not None:
             path = Path(site_vault)
             return path if path.is_absolute() else (target / path).resolve()
+    user_vault = user_config.get("vault")
+    if user_vault is not None:
+        return Path(user_vault)
     environ = env if env is not None else os.environ
     env_vault = environ.get("CRESS_VAULT")
     if env_vault:

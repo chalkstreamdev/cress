@@ -212,8 +212,18 @@ def test_resolve_vault_raises_when_neither_provided() -> None:
     assert "vault" in str(exc.value).lower()
 
 
-def test_resolve_vault_user_config_wins_over_site_config(tmp_path: Path) -> None:
-    _write_config(tmp_path, MINIMAL_CONFIG + 'vault: "/site/vault"\n')
+def test_resolve_vault_site_config_wins_over_user_config(tmp_path: Path) -> None:
+    # Most-specific wins: a project that declares its own vault (e.g. an
+    # in-repo content folder) must not be shadowed by the user's global
+    # default vault on machines that happen to have one configured.
+    site_vault = (tmp_path / "site-vault").as_posix()
+    _write_config(tmp_path, MINIMAL_CONFIG + f'vault: "{site_vault}"\n')
+    vault = resolve_vault(None, {"vault": "/user/vault"}, target=tmp_path, env={})
+    assert vault == Path(site_vault)
+
+
+def test_resolve_vault_user_config_used_when_site_config_has_no_vault(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG)  # no vault key
     vault = resolve_vault(None, {"vault": "/user/vault"}, target=tmp_path, env={})
     assert vault == Path("/user/vault")
 
