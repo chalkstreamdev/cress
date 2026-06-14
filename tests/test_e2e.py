@@ -263,6 +263,115 @@ def test_e2e_drafts_only_build(fixture: tuple[Path, Path]) -> None:
     assert drafts
 
 
+# --- static-pages mode end-to-end ---------------------------------------
+
+_STATIC_CONFIG = """\
+vault_subfolder: "Docs"
+output_dir: "public/docs"
+static_pages: true
+
+site:
+  title: "Docs"
+  description: "Evergreen documentation"
+  base_url: "https://demo.example.com/docs"
+"""
+
+
+@pytest.fixture
+def static_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    vault = tmp_path / "vault"
+    docs = vault / "Docs"
+    (docs / "guides").mkdir(parents=True)
+    (docs / "api").mkdir(parents=True)
+
+    target = tmp_path / "product"
+    (target / ".cress").mkdir(parents=True)
+    (target / ".cress" / "config.yaml").write_text(_STATIC_CONFIG, encoding="utf-8")
+    (target / "public" / "docs").mkdir(parents=True)
+
+    # Top-level landing page (undated, slug "index").
+    (docs / "index.md").write_text(
+        "---\ntitle: Documentation\nslug: index\n---\nWelcome to the docs.\n",
+        encoding="utf-8",
+    )
+    # Nested undated guide that links to a sibling via wikilink.
+    (docs / "guides" / "getting-started.md").write_text(
+        "---\ntitle: Getting Started\nslug: getting-started\n---\n"
+        "Start here, then see [[install]].\n",
+        encoding="utf-8",
+    )
+    # Nested DATED guide (mixed dated/undated).
+    (docs / "guides" / "install.md").write_text(
+        "---\ntitle: Install\nslug: install\ndate: 2026-06-01\n---\nInstall instructions.\n",
+        encoding="utf-8",
+    )
+    # A second folder with its own leaf page.
+    (docs / "api" / "import.md").write_text(
+        "---\ntitle: Import API\nslug: import\n---\nImport reference.\n",
+        encoding="utf-8",
+    )
+    return vault, target
+
+
+def test_e2e_static_pages_build(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    site = cress(vault, target)
+    result = site.build()
+    assert result.errors == []
+    out = target / "public" / "docs"
+
+    # Folder hierarchy is mirrored into output paths.
+    must_exist = [
+        "index/index.html",  # the top-level index.md page
+        "guides/getting-started/index.html",
+        "guides/install/index.html",
+        "api/import/index.html",
+        "index.html",  # the generated landing index
+        "sitemap.xml",
+    ]
+    for rel in must_exist:
+        assert (out / rel).is_file(), rel
+
+    # Wikilink resolves to the target's hierarchical, prefixed URL.
+    gs_html = (out / "guides" / "getting-started" / "index.html").read_text(encoding="utf-8")
+    assert '<a href="/docs/guides/install/">' in gs_html
+
+
+def test_static_build_omits_rss(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    assert not (out / "rss.xml").exists()
+    assert (out / "sitemap.xml").is_file()
+
+
+def test_static_build_url_prefix_composes(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    # A nested page's canonical URL composes base_url (+/docs) with the hierarchy.
+    install_html = (out / "guides" / "install" / "index.html").read_text(encoding="utf-8")
+    assert 'href="https://demo.example.com/docs/guides/install/"' in install_html
+    assert "/docs/docs/" not in install_html
+    # The generated index orders by url_path ascending (api < guides), not by date.
+    index_html = (out / "index.html").read_text(encoding="utf-8")
+    assert index_html.index("/docs/api/import/") < index_html.index("/docs/guides/install/")
+
+
+def test_blog_build_unchanged_regression(fixture: tuple[Path, Path]) -> None:
+    # Named guard that static_pages:false keeps blog invariants: flat URLs,
+    # RSS present, and a date-descending index. (test_e2e_full_build covers
+    # the full surface; this pins the specific behaviours static mode forks.)
+    vault, target = fixture
+    cress(vault, target).build()
+    out = target / "public" / "blog"
+    assert (out / "hello" / "index.html").is_file()  # flat, no folder nesting
+    assert (out / "rss.xml").is_file()
+    index_html = (out / "index.html").read_text(encoding="utf-8")
+    # p6 (2026-04-19) is newer than p4 (2026-04-17) → appears earlier.
+    assert index_html.index("/blog/p6/") < index_html.index("/blog/p4/")
+
+
 def test_e2e_vite_manifest_link_tags_injected(tmp_path: Path) -> None:
     src = _FIXTURES_DIR / "vite-manifest"
     shutil.copytree(src, tmp_path, dirs_exist_ok=True)

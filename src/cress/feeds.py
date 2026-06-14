@@ -26,11 +26,17 @@ def _canonical(path: str, base_url: str) -> str:
 
 def _post_url(post: Post, base_url: str) -> str:
     assert post.slug is not None
-    return _canonical(f"{post.slug}/", base_url)
+    return _canonical(f"{post.url_path}/", base_url)
 
 
 def _iso_date(value: _dt.date | _dt.datetime) -> str:
     return value.date().isoformat() if isinstance(value, _dt.datetime) else value.isoformat()
+
+
+def _require_date(post: Post) -> _dt.date | _dt.datetime:
+    """RSS runs blog-mode only (static force-disables it), so a date is guaranteed."""
+    assert post.date is not None, "RSS requires a date on every post"
+    return post.date
 
 
 def render_sitemap(
@@ -51,7 +57,8 @@ def render_sitemap(
     for post in posts:
         if post.draft or post.slug is None:
             continue
-        lastmod = _iso_date(post.updated or post.date)
+        stamp = post.updated or post.date
+        lastmod = _iso_date(stamp) if stamp is not None else None
         entries.append({"loc": _post_url(post, base_url), "lastmod": lastmod})
     # Tag and category pages
     for slug, _display, group_posts in tag_taxonomy.grouped():
@@ -67,8 +74,13 @@ def render_sitemap(
 
 
 def render_rss(posts: list[Post], ctx: PageContext) -> list[OutputFile]:
-    """Render ``rss.xml`` via feedgen. Empty list when ``features.rss`` is off."""
-    if not ctx.config.features.rss:
+    """Render ``rss.xml`` via feedgen.
+
+    Empty list when ``features.rss`` is off, or always in static-pages mode —
+    an evergreen, undated doc set is not a feed, and forcing it off also avoids
+    a ``None`` ``pubDate``.
+    """
+    if not ctx.config.features.rss or ctx.config.static_pages:
         return []
 
     site = ctx.config.site
@@ -79,18 +91,18 @@ def render_rss(posts: list[Post], ctx: PageContext) -> list[OutputFile]:
     fg.language(site.locale.replace("_", "-"))
 
     published = [p for p in posts if not p.draft and p.slug is not None]
-    published.sort(key=lambda p: p.date, reverse=True)
+    published.sort(key=_require_date, reverse=True)
     # Pin lastBuildDate to the latest post's date so rebuilds with no source
     # changes produce byte-identical RSS — otherwise feedgen inserts
     # ``datetime.now()`` and ``cress publish`` would churn commits.
     if published:
-        fg.lastBuildDate(_ensure_tz(published[0].date))
+        fg.lastBuildDate(_ensure_tz(_require_date(published[0])))
     for post in published[: ctx.config.features.rss_count]:
         entry = fg.add_entry()
         entry.title(post.title)
         entry.link(href=_post_url(post, site.base_url))
         entry.description(post.summary or site.description)
-        entry.pubDate(_ensure_tz(post.date))
+        entry.pubDate(_ensure_tz(_require_date(post)))
         entry.guid(_post_url(post, site.base_url), permalink=True)
 
     rss_bytes = fg.rss_str(pretty=True)

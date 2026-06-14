@@ -1,6 +1,7 @@
 """Tests for cress.feeds — sitemap + RSS generation."""
 
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -53,8 +54,9 @@ def _post(
     title: str = "T",
     *,
     draft: bool = False,
-    d: date = date(2026, 4, 19),
+    d: date | None = date(2026, 4, 19),
     summary: str = "",
+    url_path: str | None = None,
 ) -> Post:
     return Post(
         source_path=Path(f"{slug}.md"),
@@ -63,6 +65,7 @@ def _post(
         body_md="",
         frontmatter_raw={},
         slug=slug,
+        url_path=url_path if url_path is not None else slug,
         draft=draft,
         summary=summary,
     )
@@ -80,6 +83,30 @@ def test_render_sitemap_contains_post_urls(ctx: PageContext) -> None:
     locs = [el.text for el in root.iterfind(".//sm:loc", ns)]
     assert "https://example.com/blog/p1/" in locs
     assert "https://example.com/blog/p2/" in locs
+
+
+def test_rss_disabled_in_static_mode(ctx: PageContext) -> None:
+    static_ctx = replace(ctx, config=replace(ctx.config, static_pages=True))
+    outs = render_rss([_post("p1"), _post("p2")], static_ctx)
+    assert outs == []
+
+
+def test_sitemap_omits_lastmod_for_dateless_page(ctx: PageContext) -> None:
+    posts = [_post("install", d=None, url_path="guides/install")]
+    outs = render_sitemap(posts, Taxonomy(), Taxonomy(), ctx)
+    content = outs[0].content
+    assert isinstance(content, str)
+    assert "https://example.com/blog/guides/install/" in content
+    # No date anywhere → no <lastmod> elements at all (home is dateless too).
+    assert "<lastmod>" not in content
+
+
+def test_sitemap_uses_hierarchical_url(ctx: PageContext) -> None:
+    posts = [_post("install", url_path="guides/install")]
+    outs = render_sitemap(posts, Taxonomy(), Taxonomy(), ctx)
+    content = outs[0].content
+    assert isinstance(content, str)
+    assert "https://example.com/blog/guides/install/" in content
 
 
 def test_render_sitemap_excludes_drafts(ctx: PageContext) -> None:

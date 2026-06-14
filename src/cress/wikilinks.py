@@ -8,6 +8,7 @@ into real ``<a>`` tags, and emits warnings for broken references.
 import hashlib
 import html
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,21 +50,36 @@ def _post_url(post: Post, url_prefix: str = "") -> str:
     assert post.slug is not None, "slug map contains a slugless post"
     if post.draft:
         return draft_url(post, url_prefix)
-    return f"{url_prefix}/{post.slug}/"
+    return f"{url_prefix}/{post.url_path}/"
 
 
-def build_slug_map(posts: list[Post]) -> SlugMap:
-    """Build the ``{filename: post, title: post}`` lookups. Raises on duplicate slugs."""
-    slug_owners: dict[str, Post] = {}
+def _global_namespace(post: Post) -> str:
+    """Default slug namespace — every post shares one global namespace (blog mode)."""
+    del post
+    return ""
+
+
+def build_slug_map(
+    posts: list[Post], *, namespace: Callable[[Post], str] = _global_namespace
+) -> SlugMap:
+    """Build the ``{filename: post, title: post}`` lookups. Raises on duplicate slugs.
+
+    ``namespace`` partitions the duplicate check exactly as in
+    :func:`cress.post.plan_slug_writebacks`: blog mode keeps a single global
+    namespace, static mode passes a per-folder namespace so the same leaf slug
+    in different folders does not raise.
+    """
+    slug_owners: dict[tuple[str, str], Post] = {}
     for post in posts:
         if post.slug is None:
             continue
-        existing = slug_owners.get(post.slug)
+        key = (namespace(post), post.slug)
+        existing = slug_owners.get(key)
         if existing is not None:
             raise DuplicateSlugError(
                 f"slug {post.slug!r} claimed by {existing.source_path} and {post.source_path}"
             )
-        slug_owners[post.slug] = post
+        slug_owners[key] = post
 
     by_filename_lower: dict[str, Post] = {}
     by_title_lower: dict[str, Post] = {}

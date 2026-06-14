@@ -101,6 +101,48 @@ def test_cli_validate_non_zero_when_missing_slug(fixture: tuple[Path, Path]) -> 
     assert "missing_slug" in result.stdout
 
 
+def test_validate_warns_on_missing_date_in_static_mode(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (target / ".cress/config.yaml").write_text(_CONFIG + "static_pages: true\n", encoding="utf-8")
+    (vault / "Blogs/Demo/a.md").write_text("---\ntitle: A\nslug: a\n---\nbody\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate", "--vault", str(vault), "--target", str(target)])
+    # A dateless page is legitimate in static mode — surfaced, but not a failure.
+    assert result.exit_code == 0
+    assert "missing_date" in result.stdout
+
+
+def test_build_config_option_selects_alternate_config(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    # Default config builds the blog into "out"; an alternate docs config
+    # (static mode, its own subfolder + output dir) is selected via --config.
+    (vault / "Docs").mkdir()
+    (vault / "Docs/guide.md").write_text(
+        "---\ntitle: Guide\nslug: guide\n---\nbody\n", encoding="utf-8"
+    )
+    docs_config = (
+        'vault_subfolder: "Docs"\n'
+        'output_dir: "out-docs"\n'
+        "static_pages: true\n"
+        "site:\n"
+        '  title: "Docs"\n'
+        '  description: "D"\n'
+        '  base_url: "https://x.test/docs"\n'
+    )
+    alt = target / ".cress" / "docs.config.yaml"
+    alt.write_text(docs_config, encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["build", "--vault", str(vault), "--target", str(target), "--config", str(alt)],
+    )
+    assert result.exit_code == 0
+    # Hierarchy-preserving output landed in the docs output dir.
+    assert (target / "out-docs" / "guide" / "index.html").is_file()
+    # No RSS in static mode.
+    assert not (target / "out-docs" / "rss.xml").exists()
+
+
 def test_cli_validate_fix_writes_slug_and_returns_zero(
     fixture: tuple[Path, Path],
 ) -> None:

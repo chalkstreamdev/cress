@@ -61,9 +61,10 @@ def _post(
     title: str = "T",
     *,
     draft: bool = False,
-    d: date = date(2026, 4, 19),
+    d: date | None = date(2026, 4, 19),
     tags: list[str] | None = None,
     categories: list[str] | None = None,
+    url_path: str | None = None,
 ) -> Post:
     return Post(
         source_path=Path(f"{slug}.md"),
@@ -72,6 +73,7 @@ def _post(
         body_md="",
         frontmatter_raw={},
         slug=slug,
+        url_path=url_path if url_path is not None else slug,
         draft=draft,
         tags=tags or [],
         categories=categories or [],
@@ -84,6 +86,25 @@ def test_render_post_page_path(ctx: PageContext) -> None:
     assert isinstance(out, OutputFile)
     assert out.relative_path == "hello/index.html"
     assert "Hello" in out.content  # type: ignore[operator]
+
+
+def test_blog_post_path_unchanged(ctx: PageContext) -> None:
+    # Regression: blog mode (url_path == slug) writes the flat path as before.
+    post = _post("hello", title="Hello")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    assert out.relative_path == "hello/index.html"
+    assert _post_url(post, ctx.config) == "/hello/"
+
+
+def test_static_post_writes_to_hierarchical_path(ctx: PageContext) -> None:
+    post = _post("install", title="Install", url_path="guides/install")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    assert out.relative_path == "guides/install/index.html"
+
+
+def test_post_path_includes_folder(ctx: PageContext) -> None:
+    post = _post("install", url_path="guides/install")
+    assert _post_url(post, ctx.config) == "/guides/install/"
 
 
 def test_render_draft_page_path_stable(ctx: PageContext) -> None:
@@ -103,6 +124,39 @@ def test_render_index_pages_paginates(ctx: PageContext) -> None:
     assert "page/2/index.html" in paths
     assert "page/3/index.html" in paths
     # 25 posts / 10 per page = 3 pages (10, 10, 5)
+
+
+def test_static_index_sorts_by_url_path(site_config: SiteConfig) -> None:
+    static_cfg = _replace(site_config, static_pages=True)
+    engine = build_engine(static_cfg, PluginRegistry())
+    static_ctx = PageContext(
+        config=static_cfg,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+    )
+    # b/x has the *later* date but the *later* path; url_path-ascending must
+    # win, putting a/y first — proving date is not consulted.
+    posts = [
+        (_post("x", d=date(2026, 5, 1), url_path="b/x"), ""),
+        (_post("y", d=date(2026, 1, 1), url_path="a/y"), ""),
+    ]
+    outs = render_index_pages(posts, static_ctx)
+    html = outs[0].content
+    assert isinstance(html, str)
+    assert html.index("/a/y/") < html.index("/b/x/")
+
+
+def test_blog_index_still_sorts_by_date(ctx: PageContext) -> None:
+    # alphabetical url_path "a" is older; date-desc must put the newer "z" first.
+    posts = [
+        (_post("a", d=date(2026, 1, 1)), ""),
+        (_post("z", d=date(2026, 5, 1)), ""),
+    ]
+    outs = render_index_pages(posts, ctx)
+    html = outs[0].content
+    assert isinstance(html, str)
+    assert html.index("/z/") < html.index("/a/")
 
 
 def test_render_index_excludes_drafts(ctx: PageContext) -> None:

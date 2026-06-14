@@ -16,7 +16,9 @@ from cress.wikilinks import (
 )
 
 
-def _post(*, path: str, slug: str, title: str, draft: bool = False) -> Post:
+def _post(
+    *, path: str, slug: str, title: str, draft: bool = False, url_path: str | None = None
+) -> Post:
     return Post(
         source_path=Path(path),
         title=title,
@@ -24,6 +26,7 @@ def _post(*, path: str, slug: str, title: str, draft: bool = False) -> Post:
         body_md="",
         frontmatter_raw={},
         slug=slug,
+        url_path=url_path if url_path is not None else slug,
         draft=draft,
     )
 
@@ -43,6 +46,14 @@ def test_build_slug_map_raises_on_duplicate_slug() -> None:
     with pytest.raises(DuplicateSlugError) as exc:
         build_slug_map([a, b])
     assert "dup" in str(exc.value)
+
+
+def test_build_slug_map_namespaced_allows_repeated_leaf() -> None:
+    a = _post(path="guides/index.md", slug="index", title="Guides", url_path="guides/index")
+    b = _post(path="api/index.md", slug="index", title="API", url_path="api/index")
+    # Same bare slug in different folders must not collide when namespaced.
+    slug_map = build_slug_map([a, b], namespace=lambda p: p.source_path.parent.name)
+    assert slug_map.by_filename_lower["index"] is a  # first wins for filename lookup
 
 
 def test_resolve_wikilink_filename_exact_match() -> None:
@@ -66,6 +77,14 @@ def test_resolve_wikilink_title_fallback() -> None:
     result = resolve_wikilink("hello post", None, slug_map)
     assert result is not None
     assert result.url == "/hello/"
+
+
+def test_wikilink_resolves_to_nested_url() -> None:
+    a = _post(path="guides/Install.md", slug="install", title="Install", url_path="guides/install")
+    slug_map = build_slug_map([a])
+    result = resolve_wikilink("Install", None, slug_map)
+    assert result is not None
+    assert result.url == "/guides/install/"
 
 
 def test_resolve_wikilink_alias_used_as_label() -> None:

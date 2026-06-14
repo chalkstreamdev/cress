@@ -76,6 +76,12 @@ class SiteConfig:
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     pygments_style: str = "default"
     git: GitConfig = field(default_factory=GitConfig)
+    # When true, the vault is built as an evergreen documentation site rather
+    # than a dated blog: ``date`` frontmatter becomes optional, the vault's
+    # folder hierarchy is mirrored into output paths/URLs, the index sorts by
+    # path instead of date, and RSS is disabled. Default false → blog mode,
+    # byte-for-byte unchanged.
+    static_pages: bool = False
     # Derived at load time from ``site.base_url``'s path component. Example:
     # ``base_url: https://example.com/blog`` → ``url_prefix: "/blog"``. Empty
     # when the site is served at the domain root. Used to prefix every
@@ -93,9 +99,16 @@ class SiteConfig:
     extra_stylesheets: tuple[str, ...] = ()
 
 
-def load_site_config(target: Path) -> SiteConfig:
-    """Load and validate ``<target>/.cress/config.yaml``."""
-    config_path = target / ".cress" / "config.yaml"
+def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfig:
+    """Load and validate a site config.
+
+    Defaults to ``<target>/.cress/config.yaml``; ``config_path`` overrides that
+    so one product repo can host several cress sites (e.g. a blog and a docs
+    site) from different config files. All filesystem paths inside the config
+    still resolve relative to ``target``, not the config file's directory.
+    """
+    if config_path is None:
+        config_path = target / ".cress" / "config.yaml"
     if not config_path.is_file():
         raise ConfigError(f"config.yaml not found at {config_path}")
 
@@ -198,6 +211,7 @@ def load_site_config(target: Path) -> SiteConfig:
         features=features,
         pygments_style=_as_str(raw.get("pygments_style", "default"), "pygments_style"),
         git=git_cfg,
+        static_pages=_as_bool(raw.get("static_pages", False), "static_pages"),
         url_prefix=_derive_url_prefix(site_meta.base_url),
         vite_manifest=vite_manifest,
         vite_asset_prefix=_as_str(raw.get("vite_asset_prefix", "/"), "vite_asset_prefix"),
@@ -229,14 +243,17 @@ def load_user_config(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
-def _site_config_vault(target: Path) -> str | None:
-    """Read the optional ``vault:`` key from ``<target>/.cress/config.yaml``.
+def _site_config_vault(target: Path, config_path: Path | None = None) -> str | None:
+    """Read the optional ``vault:`` key from the site config.
 
-    Tolerant by design — a missing, unreadable, or malformed config returns
-    ``None`` so vault resolution can fall through to the next source. Genuine
-    config errors surface later from :func:`load_site_config`.
+    Defaults to ``<target>/.cress/config.yaml``; ``config_path`` overrides it
+    so ``--config`` selects the alternate config's vault too. Tolerant by
+    design — a missing, unreadable, or malformed config returns ``None`` so
+    vault resolution can fall through to the next source. Genuine config errors
+    surface later from :func:`load_site_config`.
     """
-    config_path = target / ".cress" / "config.yaml"
+    if config_path is None:
+        config_path = target / ".cress" / "config.yaml"
     if not config_path.is_file():
         return None
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -251,6 +268,7 @@ def resolve_vault(
     user_config: dict[str, Any],
     target: Path | None = None,
     env: Mapping[str, str] | None = None,
+    config_path: Path | None = None,
 ) -> Path:
     """Resolve the vault path from the first available source.
 
@@ -266,7 +284,7 @@ def resolve_vault(
     if cli_arg is not None:
         return cli_arg
     if target is not None:
-        site_vault = _site_config_vault(target)
+        site_vault = _site_config_vault(target, config_path)
         if site_vault is not None:
             path = Path(site_vault)
             return path if path.is_absolute() else (target / path).resolve()

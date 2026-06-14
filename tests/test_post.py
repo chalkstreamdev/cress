@@ -1,5 +1,6 @@
 """Tests for cress.post — post parsing, summary, reading time, inline tags."""
 
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import pytest
 
 from cress.config import SiteConfig, SiteMetaConfig
 from cress.exceptions import PostParseError
-from cress.post import Post, _infer_summary, parse_post
+from cress.post import Post, _infer_summary, compute_url_path, parse_post, vault_rel_dir
 
 
 @pytest.fixture
@@ -180,6 +181,87 @@ Hello world.
     assert post.canonical is None
     assert post.image is None
     assert post.image_alt is None
+
+
+# --- static pages mode --------------------------------------------------
+
+
+def test_static_mode_allows_missing_date(tmp_path: Path, site_config: SiteConfig) -> None:
+    static_config = replace(site_config, static_pages=True)
+    path = _write_post(
+        tmp_path,
+        "nodate.md",
+        """\
+---
+title: "Evergreen"
+---
+body
+""",
+    )
+    post = parse_post(path, static_config)
+    assert post.date is None
+
+
+def test_blog_mode_still_requires_date(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nodate.md",
+        """\
+---
+title: "Dated"
+---
+body
+""",
+    )
+    with pytest.raises(PostParseError) as exc:
+        parse_post(path, site_config)
+    assert "date" in str(exc.value)
+
+
+def test_url_path_defaults_empty(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "u.md",
+        """\
+---
+title: "U"
+date: 2026-04-19
+---
+body
+""",
+    )
+    post = parse_post(path, site_config)
+    assert post.url_path == ""
+
+
+def test_compute_url_path_blog_is_slug(tmp_path: Path) -> None:
+    posts_dir = tmp_path / "Blogs" / "Demo"
+    source = posts_dir / "guides" / "install.md"
+    assert compute_url_path(source, "install", posts_dir, static_pages=False) == "install"
+
+
+def test_compute_url_path_static_includes_folder(tmp_path: Path) -> None:
+    posts_dir = tmp_path / "Blogs" / "Demo"
+    source = posts_dir / "guides" / "install.md"
+    assert compute_url_path(source, "install", posts_dir, static_pages=True) == "guides/install"
+
+
+def test_compute_url_path_static_toplevel_is_slug(tmp_path: Path) -> None:
+    posts_dir = tmp_path / "Blogs" / "Demo"
+    source = posts_dir / "install.md"
+    assert compute_url_path(source, "install", posts_dir, static_pages=True) == "install"
+
+
+def test_vault_rel_dir_blog_is_empty(tmp_path: Path) -> None:
+    posts_dir = tmp_path / "Blogs" / "Demo"
+    source = posts_dir / "guides" / "deep" / "install.md"
+    assert vault_rel_dir(source, posts_dir, static_pages=False) == ""
+
+
+def test_vault_rel_dir_static_nested(tmp_path: Path) -> None:
+    posts_dir = tmp_path / "Blogs" / "Demo"
+    source = posts_dir / "guides" / "deep" / "install.md"
+    assert vault_rel_dir(source, posts_dir, static_pages=True) == "guides/deep"
 
 
 @pytest.mark.parametrize(

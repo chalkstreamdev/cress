@@ -8,7 +8,7 @@ return in-memory output for the manifest writer to persist.
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -39,13 +39,19 @@ class PageContext:
     default_image_url: str | None = None
 
 
+def _sort_date(post: Post) -> date | datetime:
+    """Index sort key for blog mode, where ``date`` is guaranteed present."""
+    assert post.date is not None, "blog-mode index requires a date on every post"
+    return post.date
+
+
 def _post_path(post: Post) -> str:
     """Path relative to the site root (no ``url_prefix``) for canonical URLs and on-disk layout."""
     assert post.slug is not None
     if post.draft:
         token = hashlib.sha256(post.slug.encode("utf-8")).hexdigest()[:8]
         return f"/_drafts/{token}-{post.slug}/"
-    return f"/{post.slug}/"
+    return f"/{post.url_path}/"
 
 
 def _post_url(post: Post, config: SiteConfig) -> str:
@@ -133,7 +139,7 @@ def render_post_page(post: Post, body_html: str, ctx: PageContext) -> OutputFile
     context = _post_context(post, body_html, ctx, path)
     name = resolve_template_name("post", ctx.config)
     html = render_template(ctx.engine, name, context)
-    return OutputFile(relative_path=f"{post.slug}/index.html", content=html)
+    return OutputFile(relative_path=f"{post.url_path}/index.html", content=html)
 
 
 def render_draft_page(post: Post, body_html: str, ctx: PageContext) -> OutputFile:
@@ -150,9 +156,17 @@ def render_draft_page(post: Post, body_html: str, ctx: PageContext) -> OutputFil
 def render_index_pages(
     posts_with_html: list[tuple[Post, str]], ctx: PageContext
 ) -> list[OutputFile]:
-    """Render reverse-chronological paginated ``/index.html`` + ``/page/N/index.html``."""
+    """Render the paginated ``/index.html`` + ``/page/N/index.html``.
+
+    Blog mode sorts reverse-chronological by ``date``. Static-pages mode has no
+    reliable date (it may be ``None``), so it sorts by ``url_path`` ascending —
+    deterministic and date-free.
+    """
     published = [(p, body) for p, body in posts_with_html if not p.draft and p.slug is not None]
-    published.sort(key=lambda item: item[0].date, reverse=True)
+    if ctx.config.static_pages:
+        published.sort(key=lambda item: item[0].url_path)
+    else:
+        published.sort(key=lambda item: _sort_date(item[0]), reverse=True)
     return _paginate(
         items=[_page_view(p, ctx.config, body) for p, body in published],
         template_name=resolve_template_name("index", ctx.config),

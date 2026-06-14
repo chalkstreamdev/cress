@@ -12,6 +12,7 @@ plan → check-collisions → apply.
 
 import datetime as _dt
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,10 +46,15 @@ class Post:
 
     source_path: Path
     title: str
-    date: _dt.date | _dt.datetime
+    date: _dt.date | _dt.datetime | None
     body_md: str
     frontmatter_raw: dict[str, Any]
     slug: str | None = None
+    # Site-root-relative path (no ``url_prefix``, no leading/trailing slash).
+    # Blog mode: equal to ``slug``. Static mode: ``"<rel_dir>/<slug>"``. The
+    # orchestrator sets this after slug write-back via :func:`compute_url_path`;
+    # it is empty at parse time because parsing has no vault-root context.
+    url_path: str = ""
     updated: _dt.date | _dt.datetime | None = None
     author: str = "Author"
     summary: str = ""
@@ -95,7 +101,37 @@ def generate_slug_for(post_path: Path, title: str) -> str:
     return slugify(title)
 
 
-def plan_slug_writebacks(posts: list[Post]) -> SlugPlan:
+def vault_rel_dir(source_path: Path, vault_posts_dir: Path, *, static_pages: bool) -> str:
+    """POSIX directory of ``source_path`` relative to ``vault_posts_dir``.
+
+    Returns ``""`` in blog mode (folder structure is discarded) or for a file
+    sitting directly under the posts root. In static mode a nested file like
+    ``<root>/guides/deep/install.md`` returns ``"guides/deep"``. This is both
+    the URL-path prefix and the slug-uniqueness namespace for static sites.
+    """
+    if not static_pages:
+        return ""
+    rel = source_path.parent.relative_to(vault_posts_dir).as_posix()
+    return "" if rel == "." else rel
+
+
+def compute_url_path(
+    source_path: Path, slug: str, vault_posts_dir: Path, *, static_pages: bool
+) -> str:
+    """Site-root-relative path for a post. Blog → ``slug``; static → ``<rel_dir>/<slug>``."""
+    rel = vault_rel_dir(source_path, vault_posts_dir, static_pages=static_pages)
+    return f"{rel}/{slug}" if rel else slug
+
+
+def _global_namespace(post: Post) -> str:
+    """Default slug namespace — every post shares one global namespace (blog mode)."""
+    del post
+    return ""
+
+
+def plan_slug_writebacks(
+    posts: list[Post], *, namespace: Callable[[Post], str] = _global_namespace
+) -> SlugPlan:
     """Compute the slug write-back plan. Pure — no disk writes.
 
     For each post missing ``slug``, derive a candidate via :func:`generate_slug_for`.
@@ -103,11 +139,16 @@ def plan_slug_writebacks(posts: list[Post]) -> SlugPlan:
     more than one post, return that set as ``duplicates`` and drop every
     write-back — the orchestrator must surface the collision before any file
     is mutated.
+
+    ``namespace`` partitions the uniqueness check. Blog mode uses a single
+    global namespace (the default), so slugs must be unique site-wide. Static
+    mode passes a per-folder namespace so ``guides/index`` and ``api/index``
+    are legitimately distinct pages rather than a false collision.
     """
-    slug_owners: dict[str, list[Path]] = {}
+    slug_owners: dict[tuple[str, str], list[Path]] = {}
     for post in posts:
         if post.slug is not None:
-            slug_owners.setdefault(post.slug, []).append(post.source_path)
+            slug_owners.setdefault((namespace(post), post.slug), []).append(post.source_path)
 
     candidates: list[tuple[Path, str]] = []
     for post in posts:
@@ -115,11 +156,11 @@ def plan_slug_writebacks(posts: list[Post]) -> SlugPlan:
             continue
         candidate = generate_slug_for(post.source_path, post.title)
         candidates.append((post.source_path, candidate))
-        slug_owners.setdefault(candidate, []).append(post.source_path)
+        slug_owners.setdefault((namespace(post), candidate), []).append(post.source_path)
 
     duplicates = [
         DuplicateSlug(slug=slug, paths=paths)
-        for slug, paths in sorted(slug_owners.items())
+        for (_ns, slug), paths in sorted(slug_owners.items())
         if len(paths) > 1
     ]
     if duplicates:
@@ -218,11 +259,12 @@ def parse_post(path: Path, config: SiteConfig) -> Post:
 
     if "title" not in metadata:
         raise PostParseError(f"{path}: missing required field `title`")
-    if "date" not in metadata:
+    # ``date`` is mandatory for blogs but optional for evergreen static pages.
+    if "date" not in metadata and not config.static_pages:
         raise PostParseError(f"{path}: missing required field `date`")
 
     title = _as_str(metadata["title"], "title", path)
-    post_date = _parse_date(metadata["date"], "date", path)
+    post_date = _parse_date(metadata["date"], "date", path) if "date" in metadata else None
     updated_raw = metadata.get("updated")
     updated = _parse_date(updated_raw, "updated", path) if updated_raw is not None else None
 

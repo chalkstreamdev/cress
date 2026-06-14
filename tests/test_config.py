@@ -260,6 +260,55 @@ def test_resolve_vault_missing_site_config_falls_through_to_env(tmp_path: Path) 
     assert vault == Path("/env/vault")
 
 
+# --- config selection (--config PATH) -----------------------------------
+
+
+def test_load_site_config_honours_explicit_path(tmp_path: Path) -> None:
+    # Default config at the usual location (blog); an alternate docs config.
+    _write_config(tmp_path, MINIMAL_CONFIG)
+    alt = tmp_path / ".cress" / "docs.config.yaml"
+    alt.write_text(MINIMAL_CONFIG + "static_pages: true\n", encoding="utf-8")
+    default_cfg = load_site_config(tmp_path)
+    docs_cfg = load_site_config(tmp_path, config_path=alt)
+    assert default_cfg.static_pages is False
+    assert docs_cfg.static_pages is True
+    # Paths still resolve relative to the target, not the config file's dir.
+    assert docs_cfg.target == tmp_path
+
+
+def test_resolve_vault_reads_alternate_config(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG)  # default config: no vault
+    alt = tmp_path / ".cress" / "docs.config.yaml"
+    docs_vault = (tmp_path / "docs-vault").as_posix()
+    alt.write_text(MINIMAL_CONFIG + f'vault: "{docs_vault}"\n', encoding="utf-8")
+    vault = resolve_vault(None, {}, target=tmp_path, env={}, config_path=alt)
+    assert vault == Path(docs_vault)
+
+
+# --- static pages mode --------------------------------------------------
+
+
+def test_static_pages_defaults_false(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG)
+    config = load_site_config(tmp_path)
+    assert config.static_pages is False
+
+
+def test_static_pages_parses_true(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + "static_pages: true\n"
+    _write_config(tmp_path, body)
+    config = load_site_config(tmp_path)
+    assert config.static_pages is True
+
+
+def test_static_pages_rejects_non_bool(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + 'static_pages: "yes"\n'
+    _write_config(tmp_path, body)
+    with pytest.raises(ConfigError) as exc:
+        load_site_config(tmp_path)
+    assert "static_pages" in str(exc.value)
+
+
 # --- stylesheet wiring --------------------------------------------------
 
 

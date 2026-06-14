@@ -64,6 +64,7 @@ def _make_post(vault: Path, slug: str, title: str = "T", body: str = "") -> Post
         body_md=body,
         frontmatter_raw={},
         slug=slug,
+        url_path=slug,
     )
 
 

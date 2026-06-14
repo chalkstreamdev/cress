@@ -39,7 +39,14 @@ from cress.pages import (
     render_tag_pages,
 )
 from cress.plugins import PluginRegistry, discover_plugins
-from cress.post import Post, apply_slug_writebacks, parse_post, plan_slug_writebacks
+from cress.post import (
+    Post,
+    apply_slug_writebacks,
+    compute_url_path,
+    parse_post,
+    plan_slug_writebacks,
+    vault_rel_dir,
+)
 from cress.render import RenderContext, build_engine, render_markdown_text
 from cress.reports import BuildWarning
 from cress.shortcodes import ShortcodeRegistry, substitute_shortcodes
@@ -58,14 +65,14 @@ def _version() -> str:
 class cress:  # noqa: N801 — spec fixes the class name as lowercase
     """Site orchestrator. Loads config on construction; builds lazily."""
 
-    def __init__(self, vault: Path, target: Path) -> None:
+    def __init__(self, vault: Path, target: Path, config_path: Path | None = None) -> None:
         if not vault.is_dir():
             raise ConfigError(f"vault does not exist: {vault}")
         if not target.is_dir():
             raise ConfigError(f"target does not exist: {target}")
         self.vault: Path = vault
         self.target: Path = target
-        self.config: SiteConfig = load_site_config(target)
+        self.config: SiteConfig = load_site_config(target, config_path)
 
     def build(self, drafts_only: bool = False, no_drafts: bool = False) -> BuildResult:
         """Run the full build pipeline (steps numbered inline below)."""
@@ -111,8 +118,15 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
             # Every post failed to parse — treat as empty input.
             raise ConfigError("no parseable posts — every file failed to parse")
 
+        # Slug-uniqueness namespace: global in blog mode, per-folder in static
+        # mode so identically-named leaves in different folders don't collide.
+        def _namespace(post: Post) -> str:
+            return vault_rel_dir(
+                post.source_path, vault_posts_dir, static_pages=self.config.static_pages
+            )
+
         # Steps 5 and 6: plan and apply slug write-backs (hard error on duplicates).
-        plan = plan_slug_writebacks(posts)
+        plan = plan_slug_writebacks(posts, namespace=_namespace)
         if plan.duplicates:
             detail = "; ".join(
                 f"{d.slug}: {', '.join(str(p) for p in d.paths)}" for d in plan.duplicates
@@ -129,6 +143,25 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
                 for p in posts
             ]
 
+        # Step 6b: stamp each post's site-root-relative ``url_path``. Now that
+        # every slug is final, compute the single source of truth the page,
+        # feed, and wikilink URL producers all read. Blog mode → ``slug``;
+        # static mode → ``<rel_dir>/<slug>`` mirroring the vault hierarchy.
+        posts = [
+            _replace(
+                post,
+                url_path=compute_url_path(
+                    post.source_path,
+                    post.slug,
+                    vault_posts_dir,
+                    static_pages=self.config.static_pages,
+                ),
+            )
+            if post.slug is not None
+            else post
+            for post in posts
+        ]
+
         # Step 7: partition drafts / published and apply filters.
         filtered = [
             p for p in posts if (not no_drafts or not p.draft) and (not drafts_only or p.draft)
@@ -143,7 +176,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
             )
 
         # Step 8: build slug map (duplicate check already done).
-        slug_map = build_slug_map(filtered)
+        slug_map = build_slug_map(filtered, namespace=_namespace)
 
         # Step 9: resolve hero images *before* building taxonomies so every
         # downstream consumer (tag/category pages, RSS, feeds) sees the same

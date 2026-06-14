@@ -70,6 +70,8 @@ uv run cress serve --live-reload
 | `cress serve` | Builds once, serves `<output_dir>` on localhost, rebuilds on source changes. `--live-reload` reloads the browser. |
 | `cress publish` | Builds, stages `<output_dir>` in the target repo, commits with the configured prefix, and optionally pushes. |
 
+Every command accepts `--config PATH` to build from an alternate config file (default `<target>/.cress/config.yaml`) — this is how one product repo hosts both a blog and a docs site (see [Static pages mode](#static-pages-mode)).
+
 Every command accepts `--json` for a machine-readable envelope:
 
 ```json
@@ -109,6 +111,7 @@ assets_dir: "public/blog/assets"     # must live under output_dir
 attachments_subfolder: "_attachments"
 paginate: 10
 default_author: "Author"
+static_pages: false                   # true → evergreen docs mode (see below)
 
 templates:
   base: "templates/blog-base.html"
@@ -161,6 +164,54 @@ For Tailwind to scan cress's output for utility classes used in markdown bodies,
 
 esbuild and webpack manifests have different shapes — open an issue if you need them; the dispatch behind `vite_manifest` is straightforward to extend.
 
+## Static pages mode
+
+By default a cress site is a dated, reverse-chronological **blog**. Setting `static_pages: true` flips that whole build to an evergreen **documentation** site:
+
+```yaml
+static_pages: true
+```
+
+What changes when the flag is on (everything else is identical):
+
+| | Blog (default) | Static pages (`static_pages: true`) |
+| --- | --- | --- |
+| `date` frontmatter | Required | **Optional** (a dateless page is fine) |
+| Output path / URL | Flat `/<slug>/` | **Folder hierarchy preserved** — `guides/install.md` → `/guides/install/` |
+| Index order | `date`, newest first | `url_path`, ascending |
+| RSS | Generated | **Disabled** (an undated doc set is not a feed) |
+| Sitemap | `lastmod` from date | Present; `lastmod` omitted for dateless pages |
+| Slug uniqueness | Global | Per-folder — `guides/index.md` and `api/index.md` coexist |
+
+A page's URL mirrors its location under `vault_subfolder`; the file's leaf name is still the slug. `cress validate` reports a dateless page as an informational `missing_date` warning (it does not fail the run). Wikilinks still resolve by filename/title and now point at the target's hierarchical URL.
+
+### Running a blog and a docs site from one repo
+
+Docs live in their **own vault** (or `vault_subfolder`) with their own config and output dir, built as a second, independent cress site that shares the product's CSS bundle exactly as the blog does. Add a second config beside the blog's, e.g. `.cress/docs.config.yaml`:
+
+```yaml
+vault_subfolder: "Docs"
+output_dir: "public/docs"
+static_pages: true
+vault: "../DocsVault"          # the docs' own Obsidian vault
+site:
+  title: "Docs"
+  description: "Product documentation"
+  base_url: "https://myproduct.com/docs"
+vite_manifest: "frontend/dist/.vite/manifest.json"   # same bundle as the blog
+```
+
+Then build each site by selecting its config:
+
+```bash
+cress build                                  # the blog (default config)
+cress build --config .cress/docs.config.yaml # the docs site
+```
+
+Both emit into the same product repo at different paths (`/blog`, `/docs`), each styled by the shared Vite bundle. No "sections" concept — they are simply two cress invocations.
+
+> Not in this phase: a sidebar nav tree, manual page ordering (`nav_order:`), and a dedicated `doc` template type. Static pages render through the existing `post` template, overridable via `templates:` / `template_dir` like any blog.
+
 ## Post frontmatter
 
 ```yaml
@@ -183,7 +234,7 @@ canonical: https://example.com/x
 ---
 ```
 
-Dates must be ISO 8601. Missing `slug` values are generated from `title` and written back to the source file at build time.
+Dates must be ISO 8601. `date` is required in blog mode but optional under [`static_pages`](#static-pages-mode). Missing `slug` values are generated from `title` and written back to the source file at build time.
 
 ## Authoring features
 

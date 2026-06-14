@@ -84,6 +84,27 @@ def test_plan_detects_collision_with_existing_slug(tmp_path: Path) -> None:
     assert plan.duplicates[0].slug == "same-title"
 
 
+def test_plan_slug_writebacks_namespaced_by_folder(tmp_path: Path) -> None:
+    guides = _post_with(tmp_path / "guides" / "index.md", slug=None, title="Index")
+    api = _post_with(tmp_path / "api" / "index.md", slug=None, title="Index")
+    plan = plan_slug_writebacks([guides, api], namespace=lambda p: p.source_path.parent.name)
+    # Same leaf slug "index", different folders → no collision.
+    assert plan.duplicates == []
+    assert set(plan.writebacks) == {
+        (guides.source_path, "index"),
+        (api.source_path, "index"),
+    }
+
+
+def test_plan_slug_writebacks_same_folder_collides(tmp_path: Path) -> None:
+    a = _post_with(tmp_path / "guides" / "a.md", slug=None, title="Index")
+    b = _post_with(tmp_path / "guides" / "b.md", slug=None, title="Index")
+    plan = plan_slug_writebacks([a, b], namespace=lambda p: p.source_path.parent.name)
+    assert plan.writebacks == []
+    assert len(plan.duplicates) == 1
+    assert plan.duplicates[0].slug == "index"
+
+
 def test_apply_writeback_preserves_body_bytes(tmp_path: Path, site_config: SiteConfig) -> None:
     path = tmp_path / "post.md"
     original = (

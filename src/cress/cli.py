@@ -14,7 +14,13 @@ import typer
 from cress.build_result import BuildResult
 from cress.config import load_user_config, resolve_vault
 from cress.exceptions import CressError
-from cress.post import apply_slug_writebacks, parse_post, plan_slug_writebacks
+from cress.post import (
+    Post,
+    apply_slug_writebacks,
+    parse_post,
+    plan_slug_writebacks,
+    vault_rel_dir,
+)
 from cress.reports import BuildWarning
 from cress.site import cress
 from cress.wikilinks import build_slug_map, substitute_wikilinks
@@ -25,10 +31,20 @@ app: typer.Typer = typer.Typer(
     no_args_is_help=True,
 )
 
+# Validate issue types that are surfaced for awareness but never fail the run.
+_SOFT_VALIDATE_TYPES: frozenset[str] = frozenset({"missing_date"})
 
-def _resolve_vault_option(vault_opt: Path | None, target: Path) -> Path:
+
+def _resolve_vault_option(
+    vault_opt: Path | None, target: Path, config_path: Path | None = None
+) -> Path:
     user_config = load_user_config()
-    return resolve_vault(vault_opt, user_config, target=target)
+    return resolve_vault(vault_opt, user_config, target=target, config_path=config_path)
+
+
+_CONFIG_OPTION = typer.Option(
+    "--config", help="Alternate site config path (default: <target>/.cress/config.yaml)."
+)
 
 
 def _json_envelope(
@@ -77,14 +93,15 @@ def build(
         Path, typer.Option(help="Target product repo (default: current directory).")
     ] = Path("."),
     vault: Annotated[Path | None, typer.Option(help="Obsidian vault root.")] = None,
+    config: Annotated[Path | None, _CONFIG_OPTION] = None,
     drafts_only: Annotated[bool, typer.Option("--drafts-only")] = False,
     no_drafts: Annotated[bool, typer.Option("--no-drafts")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Build the site into the target repo's output directory."""
     try:
-        resolved_vault = _resolve_vault_option(vault, target)
-        site = cress(resolved_vault, target)
+        resolved_vault = _resolve_vault_option(vault, target, config)
+        site = cress(resolved_vault, target, config)
         result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
     except CressError as exc:
         raise _emit_hard_error(exc, json_output=json_output) from exc
@@ -114,18 +131,22 @@ def validate(
         Path, typer.Option(help="Target product repo (default: current directory).")
     ] = Path("."),
     vault: Annotated[Path | None, typer.Option(help="Obsidian vault root.")] = None,
+    config: Annotated[Path | None, _CONFIG_OPTION] = None,
     fix: Annotated[bool, typer.Option("--fix")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Dry-run parse every post and report issues."""
     try:
-        resolved_vault = _resolve_vault_option(vault, target)
-        site = cress(resolved_vault, target)
+        resolved_vault = _resolve_vault_option(vault, target, config)
+        site = cress(resolved_vault, target, config)
         issues = _run_validate(site, fix=fix)
     except CressError as exc:
         raise _emit_hard_error(exc, json_output=json_output) from exc
 
-    ok = not issues
+    # ``missing_date`` is informational in static-pages mode (a dateless page
+    # is legitimate there) — surfaced, but it must not fail validation.
+    hard_issues = [i for i in issues if i.type not in _SOFT_VALIDATE_TYPES]
+    ok = not hard_issues
     if json_output:
         typer.echo(
             _json_envelope(ok=ok, result={"issues": len(issues)}, warnings=issues, errors=[])
@@ -145,6 +166,7 @@ def serve(
         Path, typer.Option(help="Target product repo (default: current directory).")
     ] = Path("."),
     vault: Annotated[Path | None, typer.Option(help="Obsidian vault root.")] = None,
+    config: Annotated[Path | None, _CONFIG_OPTION] = None,
     port: Annotated[int, typer.Option(help="Port to bind the dev server.")] = 8000,
     live_reload: Annotated[bool, typer.Option("--live-reload")] = False,
     drafts_only: Annotated[bool, typer.Option("--drafts-only")] = False,
@@ -155,8 +177,8 @@ def serve(
     from cress.server import serve as _serve
 
     try:
-        resolved_vault = _resolve_vault_option(vault, target)
-        site = cress(resolved_vault, target)
+        resolved_vault = _resolve_vault_option(vault, target, config)
+        site = cress(resolved_vault, target, config)
     except CressError as exc:
         raise _emit_hard_error(exc, json_output=json_output) from exc
 
@@ -176,6 +198,7 @@ def publish(
         Path, typer.Option(help="Target product repo (default: current directory).")
     ] = Path("."),
     vault: Annotated[Path | None, typer.Option(help="Obsidian vault root.")] = None,
+    config: Annotated[Path | None, _CONFIG_OPTION] = None,
     drafts_only: Annotated[bool, typer.Option("--drafts-only")] = False,
     no_drafts: Annotated[bool, typer.Option("--no-drafts")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
@@ -184,8 +207,8 @@ def publish(
     from cress.publish import commit_outputs
 
     try:
-        resolved_vault = _resolve_vault_option(vault, target)
-        site = cress(resolved_vault, target)
+        resolved_vault = _resolve_vault_option(vault, target, config)
+        site = cress(resolved_vault, target, config)
         result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
         commit = commit_outputs(
             site.target, site.config.output_dir, site.config, result.pages_written
@@ -248,7 +271,22 @@ def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
     if not posts:
         return issues
 
-    plan = plan_slug_writebacks(posts)
+    # In static-pages mode a missing date is allowed; surface it as a soft hint.
+    if site.config.static_pages:
+        for post in posts:
+            if post.date is None:
+                issues.append(
+                    BuildWarning(
+                        type="missing_date",
+                        file=str(post.source_path),
+                        message="page omits `date` (allowed in static-pages mode)",
+                    )
+                )
+
+    def _namespace(post: Post) -> str:
+        return vault_rel_dir(post.source_path, vault_posts, static_pages=site.config.static_pages)
+
+    plan = plan_slug_writebacks(posts, namespace=_namespace)
     if plan.duplicates:
         for dup in plan.duplicates:
             issues.append(
@@ -280,7 +318,7 @@ def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
                 )
 
     # Check wikilinks by running substitution against a render-agnostic body.
-    slug_map = build_slug_map(posts)
+    slug_map = build_slug_map(posts, namespace=_namespace)
     wl_warnings: list[BuildWarning] = []
     for post in posts:
         substitute_wikilinks(
