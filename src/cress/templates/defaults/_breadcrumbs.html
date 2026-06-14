@@ -1,0 +1,9 @@
+{% comment %}Breadcrumb trail Home → … → current. The current (last) crumb and any
+page-less ancestor render as plain text; the rest as links.{% endcomment %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+<ol>
+{% for crumb in breadcrumbs %}
+<li>{% if forloop.last or not crumb.url %}{{ crumb.title }}{% else %}<a href="{{ crumb.url }}">{{ crumb.title }}</a>{% endif %}</li>
+{% endfor %}
+</ol>
+</nav>

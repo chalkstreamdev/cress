@@ -28,6 +28,7 @@ from cress.config import SiteConfig, load_site_config
 from cress.exceptions import ConfigError, DuplicateSlugError, PostParseError
 from cress.feeds import render_rss, render_sitemap
 from cress.manifest import OutputFile, load_manifest, write_outputs
+from cress.nav import build_nav
 from cress.pages import (
     PageContext,
     render_category_list,
@@ -175,6 +176,13 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
                 )
             )
 
+        # Step 7b: build the navigation tree once from the published, non-hidden
+        # posts. Drafts are excluded — their published ``url_path`` isn't a real
+        # page (they render under ``_drafts/``), so a sidebar link would 404.
+        # ``nav_hidden`` is filtered here too so :func:`build_nav` stays purely
+        # structural (reconstructed from each post's ``url_path``).
+        nav_tree = build_nav([p for p in filtered if not p.draft and not p.nav_hidden], self.config)
+
         # Step 8: build slug map (duplicate check already done).
         slug_map = build_slug_map(filtered, namespace=_namespace)
 
@@ -240,6 +248,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
             cress_version=_version(),
             stylesheets=tuple(resolve_stylesheets(self.config)),
             default_image_url=og_image_url,
+            nav=nav_tree,
         )
         page_outputs: list[OutputFile] = []
         for post, body_html in posts_with_html:

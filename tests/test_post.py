@@ -183,6 +183,133 @@ Hello world.
     assert post.image_alt is None
 
 
+# --- nav frontmatter fields ---------------------------------------------
+
+
+def test_nav_fields_default(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-defaults.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+---
+body
+""",
+    )
+    post = parse_post(path, site_config)
+    assert post.nav_order is None
+    assert post.nav_title is None
+    assert post.nav_hidden is False
+
+
+def test_nav_order_parses_int(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-order.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+nav_order: 3
+---
+body
+""",
+    )
+    post = parse_post(path, site_config)
+    assert post.nav_order == 3
+
+
+def test_nav_order_rejects_non_int(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-order-bad.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+nav_order: "three"
+---
+body
+""",
+    )
+    with pytest.raises(PostParseError) as exc:
+        parse_post(path, site_config)
+    assert "nav_order" in str(exc.value)
+
+
+def test_nav_order_rejects_bool(tmp_path: Path, site_config: SiteConfig) -> None:
+    # YAML parses ``true`` as a bool, which is an ``int`` subclass — reject it.
+    path = _write_post(
+        tmp_path,
+        "nav-order-bool.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+nav_order: true
+---
+body
+""",
+    )
+    with pytest.raises(PostParseError) as exc:
+        parse_post(path, site_config)
+    assert "nav_order" in str(exc.value)
+
+
+def test_nav_title_parses(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-title.md",
+        """\
+---
+title: "Game Phases"
+date: 2026-04-19
+nav_title: "Phases"
+---
+body
+""",
+    )
+    post = parse_post(path, site_config)
+    assert post.nav_title == "Phases"
+
+
+def test_nav_hidden_parses_bool(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-hidden.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+nav_hidden: true
+---
+body
+""",
+    )
+    post = parse_post(path, site_config)
+    assert post.nav_hidden is True
+
+
+def test_nav_hidden_rejects_non_bool(tmp_path: Path, site_config: SiteConfig) -> None:
+    path = _write_post(
+        tmp_path,
+        "nav-hidden-bad.md",
+        """\
+---
+title: "Nav"
+date: 2026-04-19
+nav_hidden: "yes"
+---
+body
+""",
+    )
+    with pytest.raises(PostParseError) as exc:
+        parse_post(path, site_config)
+    assert "nav_hidden" in str(exc.value)
+
+
 # --- static pages mode --------------------------------------------------
 
 

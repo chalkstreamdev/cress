@@ -358,6 +358,80 @@ def test_static_build_url_prefix_composes(static_fixture: tuple[Path, Path]) -> 
     assert index_html.index("/docs/api/import/") < index_html.index("/docs/guides/install/")
 
 
+# --- sidebar nav tree + breadcrumbs (static-pages mode) -----------------
+
+
+def test_static_build_renders_sidebar_tree(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    install_html = (out / "guides" / "install" / "index.html").read_text(encoding="utf-8")
+    # A sidebar nav exists with the nested tree.
+    assert 'class="sidebar"' in install_html
+    assert 'class="nav-tree"' in install_html
+    # Home + the page links appear in the tree.
+    assert 'href="/docs/"' in install_html  # Home
+    assert 'href="/docs/guides/install/"' in install_html
+    assert 'href="/docs/api/import/"' in install_html
+    # Nested: a <ul> nested inside an <li> (depth > 1).
+    assert install_html.count('class="nav-tree"') >= 2
+
+
+def test_sidebar_marks_active_and_open(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    install_html = (out / "guides" / "install" / "index.html").read_text(encoding="utf-8")
+    # The current page's node is active...
+    assert "nav-active" in install_html
+    assert 'aria-current="page"' in install_html
+    # ...and the install link carries it.
+    active_line = next(ln for ln in install_html.splitlines() if 'aria-current="page"' in ln)
+    assert "/docs/guides/install/" in active_line
+    # The ancestor (Guides) branch is open.
+    assert "nav-open" in install_html
+
+
+def test_pageless_folder_renders_nonclickable(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    install_html = (out / "guides" / "install" / "index.html").read_text(encoding="utf-8")
+    # "guides" and "api" have no landing file → rendered as <span>, not a link.
+    assert '<span class="nav-section">Guides</span>' in install_html
+    assert '<span class="nav-section">Api</span>' in install_html
+    # No link to a non-existent /docs/guides/ landing page.
+    assert 'href="/docs/guides/"' not in install_html
+
+
+def test_breadcrumbs_render(static_fixture: tuple[Path, Path]) -> None:
+    vault, target = static_fixture
+    cress(vault, target).build()
+    out = target / "public" / "docs"
+    install_html = (out / "guides" / "install" / "index.html").read_text(encoding="utf-8")
+    assert 'class="breadcrumbs"' in install_html
+    crumbs = install_html[install_html.index('class="breadcrumbs"') :]
+    crumbs = crumbs[: crumbs.index("</nav>")]
+    # Home and the page-less Guides ancestor are present; current page is last.
+    assert 'href="/docs/"' in crumbs  # Home is linked
+    assert "Guides" in crumbs  # page-less ancestor crumb (text)
+    assert "Install" in crumbs  # current page
+    # The current crumb is not a link.
+    assert '<a href="/docs/guides/install/">Install</a>' not in crumbs
+
+
+def test_blog_build_html_unchanged(fixture: tuple[Path, Path]) -> None:
+    # Regression: blog mode must emit no sidebar / breadcrumb markup — the
+    # default templates gate it on `static_pages`, so blog output is unchanged.
+    vault, target = fixture
+    cress(vault, target).build()
+    out = target / "public" / "blog"
+    post_html = (out / "hello" / "index.html").read_text(encoding="utf-8")
+    assert 'class="sidebar"' not in post_html
+    assert 'class="nav-tree"' not in post_html
+    assert 'class="breadcrumbs"' not in post_html
+
+
 def test_blog_build_unchanged_regression(fixture: tuple[Path, Path]) -> None:
     # Named guard that static_pages:false keeps blog invariants: flat URLs,
     # RSS present, and a date-descending index. (test_e2e_full_build covers

@@ -56,6 +56,13 @@ class Post:
     # it is empty at parse time because parsing has no vault-root context.
     url_path: str = ""
     updated: _dt.date | _dt.datetime | None = None
+    # Navigation hints (consumed by :mod:`cress.nav` in static-pages mode).
+    # ``nav_order`` sorts siblings ascending; unset pages sort after ordered
+    # ones. ``nav_title`` overrides the sidebar label (falls back to ``title``).
+    # ``nav_hidden`` drops a page from the tree (it still builds + is linkable).
+    nav_order: int | None = None
+    nav_title: str | None = None
+    nav_hidden: bool = False
     author: str = "Author"
     summary: str = ""
     image: str | None = None
@@ -271,6 +278,12 @@ def parse_post(path: Path, config: SiteConfig) -> Post:
     slug_raw = metadata.get("slug")
     slug = _as_str(slug_raw, "slug", path) if slug_raw is not None else None
 
+    nav_order_raw = metadata.get("nav_order")
+    nav_order = _as_int(nav_order_raw, "nav_order", path) if nav_order_raw is not None else None
+    nav_title_raw = metadata.get("nav_title")
+    nav_title = _as_str(nav_title_raw, "nav_title", path) if nav_title_raw is not None else None
+    nav_hidden = _as_bool(metadata.get("nav_hidden", False), "nav_hidden", path)
+
     author = _as_str(metadata.get("author", config.default_author), "author", path)
     draft = _as_bool(metadata.get("draft", False), "draft", path)
     canonical_raw = metadata.get("canonical")
@@ -301,6 +314,9 @@ def parse_post(path: Path, config: SiteConfig) -> Post:
         title=title,
         date=post_date,
         updated=updated,
+        nav_order=nav_order,
+        nav_title=nav_title,
+        nav_hidden=nav_hidden,
         author=author,
         summary=summary,
         image=image,
@@ -379,6 +395,15 @@ def _as_bool(value: Any, key: str, path: Path) -> bool:
     if not isinstance(value, bool):
         kind = type(value).__name__
         raise PostParseError(f"{path}: `{key}` expected boolean, got {kind}")
+    return value
+
+
+def _as_int(value: Any, key: str, path: Path) -> int:
+    # ``bool`` is an ``int`` subclass in Python; reject it so ``nav_order: true``
+    # is an error rather than a silent ``1``.
+    if not isinstance(value, int) or isinstance(value, bool):
+        kind = type(value).__name__
+        raise PostParseError(f"{path}: `{key}` expected integer, got {kind}")
     return value
 
 

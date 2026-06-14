@@ -19,6 +19,16 @@ site:
   base_url: "https://x.test"
 """
 
+_STATIC_CONFIG = """\
+vault_subfolder: "Blogs/Demo"
+output_dir: "out"
+static_pages: true
+site:
+  title: "Manual"
+  description: "D"
+  base_url: "https://x.test"
+"""
+
 
 @pytest.fixture(autouse=True)
 def _reset_plugins() -> None:
@@ -45,6 +55,82 @@ def _set_up_fixture(
     for name, body in (extra_posts or {}).items():
         (posts_dir / name).write_text(body, encoding="utf-8")
     return vault, target
+
+
+def _set_up_static_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    """A static-pages vault with a nested folder hierarchy (no slug write-backs)."""
+    vault = tmp_path / "vault"
+    posts_dir = vault / "Blogs/Demo"
+    (posts_dir / "position-tagging").mkdir(parents=True)
+    (vault / "_attachments").mkdir()
+
+    target = tmp_path / "target"
+    (target / ".cress").mkdir(parents=True)
+    (target / ".cress" / "config.yaml").write_text(_STATIC_CONFIG, encoding="utf-8")
+    (target / "out").mkdir()
+
+    (posts_dir / "position-tagging.md").write_text(
+        "---\ntitle: Position Tagging\nslug: position-tagging\n---\nLanding.\n",
+        encoding="utf-8",
+    )
+    (posts_dir / "position-tagging" / "events.md").write_text(
+        "---\ntitle: Events\nslug: events\n---\nEvents body.\n",
+        encoding="utf-8",
+    )
+    return vault, target
+
+
+def test_build_passes_nav_tree(tmp_path: Path) -> None:
+    """build() constructs the nav tree from filtered posts and threads it via PageContext."""
+    import cress.site as site_mod
+    from cress.nav import NavTree, breadcrumbs_for
+
+    vault, target = _set_up_static_fixture(tmp_path)
+
+    captured: dict[str, NavTree] = {}
+    real = site_mod.render_post_page
+
+    def spy(post, body, ctx):  # type: ignore[no-untyped-def]
+        captured["nav"] = ctx.nav
+        return real(post, body, ctx)
+
+    with mock.patch.object(site_mod, "render_post_page", spy):
+        cress(vault, target).build()
+
+    nav = captured["nav"]
+    # The nested folder reconstructed a tree with a merged section node.
+    section = nav.by_path["position-tagging"]
+    assert section.has_page is True
+    assert any(c.url_path == "position-tagging/events" for c in section.children)
+    # And breadcrumbs resolve for the child page.
+    trail = breadcrumbs_for("position-tagging/events", nav)
+    assert [n.title for n in trail] == ["Manual", "Position Tagging", "Events"]
+
+
+def test_nav_tree_excludes_drafts(tmp_path: Path) -> None:
+    """A draft page is absent from the sidebar tree (its published URL isn't real)."""
+    import cress.site as site_mod
+    from cress.nav import NavTree
+
+    vault, target = _set_up_static_fixture(tmp_path)
+    (vault / "Blogs/Demo" / "wip.md").write_text(
+        "---\ntitle: Work In Progress\nslug: wip\ndraft: true\n---\nDraft body.\n",
+        encoding="utf-8",
+    )
+
+    captured: dict[str, NavTree] = {}
+    real = site_mod.render_post_page
+
+    def spy(post, body, ctx):  # type: ignore[no-untyped-def]
+        captured["nav"] = ctx.nav
+        return real(post, body, ctx)
+
+    with mock.patch.object(site_mod, "render_post_page", spy):
+        cress(vault, target).build()
+
+    nav = captured["nav"]
+    assert "wip" not in nav.by_path
+    assert all(n.url_path != "wip" for n in nav.roots)
 
 
 def test_init_is_cheap(tmp_path: Path) -> None:

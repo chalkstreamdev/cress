@@ -210,7 +210,31 @@ cress build --config .cress/docs.config.yaml # the docs site
 
 Both emit into the same product repo at different paths (`/blog`, `/docs`), each styled by the shared Vite bundle. No "sections" concept — they are simply two cress invocations.
 
-> Not in this phase: a sidebar nav tree, manual page ordering (`nav_order:`), and a dedicated `doc` template type. Static pages render through the existing `post` template, overridable via `templates:` / `template_dir` like any blog.
+### Navigation (static-pages mode)
+
+In static-pages mode cress reconstructs the vault's folder hierarchy into two navigation primitives, both derived purely from each page's `url_path` and injected into every template's context:
+
+- **`nav`** — a nested tree. The default `base.html` renders it as a recursive sidebar (`_nav.html`), to arbitrary depth.
+- **`breadcrumbs`** — the Home → … → current-page trail for the page being rendered (`_breadcrumbs.html`).
+
+Both are gated on `static_pages` in the default templates, so **blog output is byte-for-byte unchanged**. Override `_nav.html` / `_breadcrumbs.html` (or `base.html`) via `template_dir` to restyle them.
+
+How the tree is built:
+
+- **Section landing ↔ folder merge.** A top-level file beside a same-named folder (`position-tagging.md` + `position-tagging/`) becomes **one** node: the file is its clickable page, the folder's contents are its children.
+- **Page-less folder.** A folder with no landing file (`api/` with only `api/install.md`) becomes a **non-clickable section header** (`<span>`, no synthesized landing page).
+- **Home node.** The auto-generated index is prepended as a synthetic Home node (`title = site.title`), and breadcrumbs always begin with it.
+- **Ordering.** Per level: `nav_order` ascending first, then unordered pages alphabetically by label.
+
+Three optional frontmatter fields control a page's place in the tree (all static-pages-only; ignored in blog mode):
+
+| Field | Effect |
+| --- | --- |
+| `nav_order: <int>` | Sort key within its level (ascending). Unset pages sort after ordered ones, then alphabetically. |
+| `nav_title: "<label>"` | Overrides the sidebar/breadcrumb label (falls back to `title`). |
+| `nav_hidden: true` | Drops the page from the tree. It still builds and is reachable by URL. |
+
+> Still not in this phase: a dedicated `doc` template type. Static pages render through the existing `post` template, overridable via `templates:` / `template_dir` like any blog.
 
 ## Post frontmatter
 
@@ -231,10 +255,15 @@ categories: [engineering, product]
 tags: [charts, defaults, ux]
 draft: false
 canonical: https://example.com/x
+
+# static-pages navigation (ignored in blog mode)
+nav_order: 3                      # sidebar sort key within its folder level
+nav_title: "Phases"              # sidebar/breadcrumb label override
+nav_hidden: false                 # true → omit from the sidebar tree (still builds)
 ---
 ```
 
-Dates must be ISO 8601. `date` is required in blog mode but optional under [`static_pages`](#static-pages-mode). Missing `slug` values are generated from `title` and written back to the source file at build time.
+Dates must be ISO 8601. `date` is required in blog mode but optional under [`static_pages`](#static-pages-mode). Missing `slug` values are generated from `title` and written back to the source file at build time. The `nav_*` fields shape the [static-pages sidebar](#navigation-static-pages-mode) and have no effect in blog mode.
 
 ## Authoring features
 

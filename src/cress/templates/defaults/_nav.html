@@ -1,0 +1,12 @@
+{% comment %}Recursive sidebar tree. Expects `nodes` (a tuple of NavNode); inherits
+`breadcrumbs` from the parent context to mark the active node and open branches.{% endcomment %}
+{% with current=breadcrumbs|last %}
+<ul class="nav-tree">
+{% for node in nodes %}
+<li class="nav-item{% if node in breadcrumbs %} nav-open{% endif %}{% if node.url_path == current.url_path %} nav-active{% endif %}">
+{% if node.url %}<a href="{{ node.url }}"{% if node.url_path == current.url_path %} aria-current="page"{% endif %}>{{ node.title }}</a>{% else %}<span class="nav-section">{{ node.title }}</span>{% endif %}
+{% if node.children %}{% include "defaults/_nav.html" with nodes=node.children %}{% endif %}
+</li>
+{% endfor %}
+</ul>
+{% endwith %}

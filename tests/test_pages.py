@@ -9,9 +9,11 @@ import pytest
 
 from cress.config import SiteConfig, SiteMetaConfig
 from cress.manifest import OutputFile
+from cress.nav import NavTree, build_nav
 from cress.pages import (
     PageContext,
     _base_context,
+    _post_context,
     _post_url,
     render_category_list,
     render_category_pages,
@@ -469,6 +471,53 @@ def test_manifest_read_once_per_build(
     render_index_pages(posts, page_ctx)
 
     assert len(calls) == 1
+
+
+# --- nav + breadcrumbs context wiring ------------------------------------
+
+
+def test_base_context_includes_nav_and_static_flag(ctx: PageContext) -> None:
+    base = _base_context(ctx, canonical_path="/")
+    assert "nav" in base
+    assert "static_pages" in base
+    # Default ctx has the empty tree and blog mode.
+    assert isinstance(base["nav"], NavTree)
+    assert base["static_pages"] is False
+
+
+def test_base_context_static_flag_reflects_config(site_config: SiteConfig) -> None:
+    static_cfg = _replace(site_config, static_pages=True)
+    engine = build_engine(static_cfg, PluginRegistry())
+    static_ctx = PageContext(
+        config=static_cfg,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+    )
+    base = _base_context(static_ctx, canonical_path="/")
+    assert base["static_pages"] is True
+
+
+def test_post_context_includes_breadcrumbs(site_config: SiteConfig) -> None:
+    static_cfg = _replace(site_config, static_pages=True)
+    engine = build_engine(static_cfg, PluginRegistry())
+    posts = [
+        _post("position-tagging", "Position Tagging", url_path="position-tagging"),
+        _post("events", "Events", url_path="position-tagging/events"),
+    ]
+    tree = build_nav(posts, static_cfg)
+    static_ctx = PageContext(
+        config=static_cfg,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+        nav=tree,
+    )
+    events = posts[1]
+    context = _post_context(events, "<p>body</p>", static_ctx, "/position-tagging/events/")
+    assert "breadcrumbs" in context
+    trail = context["breadcrumbs"]
+    assert [n.title for n in trail] == ["Example", "Position Tagging", "Events"]
 
 
 def test_canonical_url_not_double_prefixed(tmp_path: Path) -> None:

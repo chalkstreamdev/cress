@@ -11,6 +11,8 @@
 </head>
 <body>
 <header><a href="/"><strong>{{ site.title }}</strong></a></header>
+{% if static_pages %}<aside class="sidebar">{% include "defaults/_nav.html" with nodes=nav.roots %}</aside>
+{% include "defaults/_breadcrumbs.html" %}{% endif %}
 <main>{% block content %}{% endblock %}</main>
 <footer>{% block footer %}<small>&copy; {{ now|date:"Y" }} {{ site.title }}</small>{% endblock %}</footer>
 </body>

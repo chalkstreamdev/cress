@@ -7,7 +7,7 @@ return in-memory output for the manifest writer to persist.
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -16,6 +16,7 @@ from django.template import Engine
 
 from cress.config import SiteConfig
 from cress.manifest import OutputFile
+from cress.nav import NavTree, breadcrumbs_for
 from cress.post import Post
 from cress.render import render_template, resolve_template_name
 from cress.taxonomy import Taxonomy
@@ -37,6 +38,11 @@ class PageContext:
     # with its own resolved hero image overrides this; pages without a hero fall
     # back to it. ``None`` when no default image is configured.
     default_image_url: str | None = None
+    # Navigation tree (static-pages mode), built once per build from the
+    # filtered, non-``nav_hidden`` posts. Always present in context so templates
+    # can render a sidebar; the default templates only do so when
+    # ``static_pages`` is true. Empty by default (blog mode never uses it).
+    nav: NavTree = field(default_factory=lambda: NavTree(roots=(), by_path={}))
 
 
 def _sort_date(post: Post) -> date | datetime:
@@ -117,6 +123,11 @@ def _base_context(ctx: PageContext, *, canonical_path: str) -> dict[str, Any]:
         "og_image_alt": None,
         "page": None,
         "stylesheets": ctx.stylesheets,
+        "nav": ctx.nav,
+        "static_pages": ctx.config.static_pages,
+        # Default trail (Home, or empty in blog mode). Post pages override this
+        # with their own ancestor chain in :func:`_post_context`.
+        "breadcrumbs": breadcrumbs_for("", ctx.nav),
     }
 
 
@@ -125,6 +136,7 @@ def _post_context(post: Post, body_html: str, ctx: PageContext, path: str) -> di
     view = _page_view(post, ctx.config, body_html)
     context = _base_context(ctx, canonical_path=path)
     context["page"] = view
+    context["breadcrumbs"] = breadcrumbs_for(post.url_path, ctx.nav)
     # A post's own hero image wins over the site-wide default for og:image.
     if view["image_url"] is not None:
         context["og_image_url"] = _absolute_image_url(view["image_url"], ctx.config)
