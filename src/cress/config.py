@@ -123,13 +123,14 @@ def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfi
     if not isinstance(raw, dict):
         raise ConfigError(f"{config_path}: top-level must be a mapping")
 
-    _require_keys(raw, ("vault_subfolder", "output_dir", "site"), parent="")
+    _require_keys(raw, ("output_dir", "site"), parent="")
     site_raw = raw["site"]
     if not isinstance(site_raw, dict):
         raise ConfigError("site: must be a mapping")
     _require_keys(site_raw, ("title", "description", "base_url"), parent="site.")
 
-    vault_subfolder = _as_str(raw["vault_subfolder"], "vault_subfolder")
+    # Optional: omit to publish the whole vault ("" → ``vault / ""`` is the vault root).
+    vault_subfolder = _as_str(raw.get("vault_subfolder", ""), "vault_subfolder")
     output_dir_rel = _as_str(raw["output_dir"], "output_dir")
     output_dir = (target / output_dir_rel).resolve()
 

@@ -2,8 +2,8 @@
 
 Cress is a highly opinionated, Obsidian-vault-to-static site generator for blogs and documentation. 
 
-Why you might want to use cress: If you have a similar tech stack to us -- Django on the backend,
-Vue/React on the frontend -- and want to lean on Obsidian's great tooling to write blog posts. 
+Why you might want to use cress: If you have a similar tech stack to us — Django on the backend,
+Vue/React on the frontend — and want to lean on Obsidian's great tooling to write blog posts. 
 
 Cress was built specifically for our pipeline at Chalkstream, where we write all our documentation
 as simple markdown in Obsidian vaults. Marrying these together into a static site generator made 
@@ -32,38 +32,43 @@ directly to stage and commit the blog and push it to your live site in one comma
  
 ## Install
 
+Cress is a CLI you point at a product repo, so the simplest install is as a global tool straight from GitHub:
+
 ```bash
-uv add cress
-# or inside the cress repo itself:
+uv tool install git+https://github.com/chalkstreamdev/cress
+uv tool update-shell    # one-time: puts uv's tool bin dir on PATH
+```
+
+That puts a `cress` (and `cress.exe` on Windows) command on your PATH, usable from any directory.
+The rest of this README assumes a global `cress`; prefix with `uv run` instead if you installed it
+as a project dependency (below).
+
+**Alternative — as a dependency of a uv-managed product repo.** If the repo you're publishing from
+is itself a uv project, add cress to it and call it via `uv run`:
+
+```bash
+uv add git+https://github.com/chalkstreamdev/cress
+uv run cress build
+```
+
+**Alternative — clone to develop against cress itself:**
+
+```bash
+git clone https://github.com/chalkstreamdev/cress
+cd cress
 uv sync
+uv run cress --help
 ```
 
 cress targets Python 3.14.
 
 ## Quickstart
 
-1. **Tell cress where your vault lives.** cress resolves the vault path from the first source available, in this order:
-
-   1. `--vault` on the command line
-   2. `vault:` in the user config (`~/.config/cress/config.yaml`)
-   3. `vault:` in the site config (`<target>/.cress/config.yaml`)
-   4. the `CRESS_VAULT` environment variable
+1. **Create `.cress/config.yaml` in your product repo.** This is the only required step. It points cress at your Obsidian vault and says where to write the output:
 
 ```yaml
-# ~/.config/cress/config.yaml
-vault: /Users/me/Obsidian/Main
-```
-
-   Setting `vault:` in the **site config** is what makes a synced-drive,
-   multi-machine setup zero-config: the path travels with the repo, so a second
-   machine that shares the same repos+vault tree needs no per-user setup. A
-   relative `vault:` there is resolved against the target repo (e.g. `../Vault`).
-
-2. **Add `.cress/config.yaml` to your product repo**:
-
-```yaml
-vault_subfolder: "Blogs/MyProduct"
-output_dir: "public/blog"
+vault: "../Vault"             # path to your Obsidian vault (relative to this repo)
+output_dir: "public/blog"     # where to write the rendered site (relative to this repo)
 
 site:
   title: "My Product Blog"
@@ -71,22 +76,48 @@ site:
   base_url: "https://myproduct.com/blog"
 ```
 
-3. **Build** (from the product repo root — `--target` defaults to the current directory):
+That's the whole setup — cress is ready to build. By default it publishes the entire vault; to publish only one folder, add `vault_subfolder: "Blogs/MyProduct"` (see [Configuration](#configuration)).
+
+2. **Preview while you write** (builds, serves on localhost, and reloads the browser on every change):
 
 ```bash
-uv run cress build
+cress serve --live-reload
 ```
 
-4. **Publish** (commits `public/blog` in the product repo; pushes if `git.auto_push: true`):
+3. **Build and publish** when you're happy. `build` renders into `output_dir`; `publish` commits it in your repo (and pushes if `git.auto_push: true`):
 
 ```bash
-uv run cress publish
+cress build      # render the site into output_dir
+cress publish    # commit, and optionally push, the built site
 ```
 
-5. **Live-reload while writing**:
+Commands run from the product repo root — `--target` defaults to the current directory.
 
-```bash
-uv run cress serve --live-reload
+## Telling cress where your vault is
+
+Putting `vault:` in `.cress/config.yaml` (as in the Quickstart) is the simplest setup. The value can be either an **absolute** path or a path **relative to the repo**:
+
+```yaml
+# Absolute — points at a fixed location, wherever you run cress from:
+vault: "/Users/me/Obsidian/Main"
+
+# Relative — resolved against this repo's root (where .cress/ lives):
+vault: "../Vault"          # vault sits next to the product repo
+vault: "content/vault"     # vault lives inside the repo
+```
+
+You don't have to keep `vault:` in the site config, though. cress resolves the vault path from the first source available, in this order (most-specific wins):
+
+1. `--vault` on the command line
+2. `vault:` in the site config (`<target>/.cress/config.yaml`) — relative paths resolved against the repo
+3. `vault:` in the user config (`~/.config/cress/config.yaml`) — use an absolute path
+4. the `CRESS_VAULT` environment variable — use an absolute path
+
+Only the site config resolves a relative path against the repo. The user config and `CRESS_VAULT` are read verbatim, so a relative path there would be interpreted from your current working directory — always give those an absolute path. A global default vault for every site you build on a machine goes in the user config:
+
+```yaml
+# ~/.config/cress/config.yaml
+vault: /Users/me/Obsidian/Main
 ```
 
 ## Commands
@@ -118,12 +149,15 @@ The full `.cress/config.yaml` schema:
 
 ```yaml
 # Required
-vault_subfolder: "Blogs/MyProduct"   # relative to the vault root
 output_dir: "public/blog"             # relative to the target repo
 
-# Optional — vault location fallback (see Quickstart step 1 for the full
-# resolution order). A relative path is resolved against this repo.
+# Vault location (see "Telling cress where your vault is" for all sources and
+# the absolute-vs-relative rules). A relative path is resolved against this repo.
 vault: "../Vault"
+
+# Optional — which folder inside the vault to publish. Omit to publish the
+# whole vault; set it to scope a build to one subtree (relative to the vault root).
+vault_subfolder: "Blogs/MyProduct"
 
 site:
   title: "My Blog"

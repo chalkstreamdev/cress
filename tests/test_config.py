@@ -126,10 +126,18 @@ def test_full_config_round_trips_every_field(tmp_path: Path) -> None:
     )
 
 
+def test_vault_subfolder_optional_defaults_to_whole_vault(tmp_path: Path) -> None:
+    body = "\n".join(
+        line for line in MINIMAL_CONFIG.splitlines() if not line.startswith("vault_subfolder")
+    )
+    _write_config(tmp_path, body + "\n")
+    config = load_site_config(tmp_path)
+    assert config.vault_subfolder == ""
+
+
 @pytest.mark.parametrize(
     ("drop_path", "expected_fragment"),
     [
-        ("vault_subfolder", "vault_subfolder"),
         ("output_dir", "output_dir"),
         ("site.title", "site.title"),
         ("site.description", "site.description"),
