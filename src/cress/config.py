@@ -68,6 +68,9 @@ class SiteConfig:
     site: SiteMetaConfig
     assets_dir: Path
     attachments_subfolder: str = "_attachments"
+    # Items per index / tag / category page. ``0`` means unlimited — every item
+    # on a single page, no ``/page/N/`` splits (useful for static-page manuals
+    # whose index reads one summary per section). Must be >= 0.
     paginate: int = 10
     default_author: str = "Author"
     template_dir: Path | None = None
@@ -203,7 +206,7 @@ def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfi
         attachments_subfolder=_as_str(
             raw.get("attachments_subfolder", "_attachments"), "attachments_subfolder"
         ),
-        paginate=_as_int(raw.get("paginate", 10), "paginate"),
+        paginate=_as_int(raw.get("paginate", 10), "paginate", minimum=0),
         default_author=_as_str(raw.get("default_author", "Author"), "default_author"),
         template_dir=template_dir,
         templates=templates,
@@ -314,9 +317,11 @@ def _as_str(value: Any, key: str) -> str:
     return value
 
 
-def _as_int(value: Any, key: str) -> int:
+def _as_int(value: Any, key: str, *, minimum: int | None = None) -> int:
     if not isinstance(value, int) or isinstance(value, bool):
         raise ConfigError(f"{key}: expected integer, got {type(value).__name__}")
+    if minimum is not None and value < minimum:
+        raise ConfigError(f"{key}: must be >= {minimum}, got {value}")
     return value
 
 

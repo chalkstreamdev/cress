@@ -54,7 +54,7 @@ def load_manifest(output_dir: Path) -> Manifest | None:
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return None
     if not isinstance(raw, dict):
         return None

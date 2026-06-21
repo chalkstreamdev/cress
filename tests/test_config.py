@@ -25,25 +25,25 @@ site:
 """
 
 FULL_CONFIG: str = """\
-vault_subfolder: "Blogs/DataHero"
+vault_subfolder: "Blogs/Acme"
 output_dir: "public/blog"
 site:
-  title: "DataHero Blog"
+  title: "Acme Blog"
   description: "Writing on data viz"
-  base_url: "https://datahero.com/blog"
+  base_url: "https://acme.com/blog"
   locale: "en_GB"
-  twitter_handle: "@datahero"
+  twitter_handle: "@acme"
   default_image: "og-default.png"
 template_dir: "blog-templates"
 assets_dir: "public/blog/static"
 attachments_subfolder: "_files"
 paginate: 5
-default_author: "DataHero Team"
+default_author: "Acme Team"
 templates:
   base: "templates/blog-base.html"
   post_card: "templates/_post_card.html"
 shortcodes:
-  datahero-chart: "blog-templates/shortcodes/datahero-chart.html"
+  acme-chart: "blog-templates/shortcodes/acme-chart.html"
 features:
   rss: false
   rss_count: 50
@@ -95,27 +95,27 @@ def test_minimal_config_fills_defaults(tmp_path: Path) -> None:
 def test_full_config_round_trips_every_field(tmp_path: Path) -> None:
     _write_config(tmp_path, FULL_CONFIG)
     config = load_site_config(tmp_path)
-    assert config.vault_subfolder == "Blogs/DataHero"
+    assert config.vault_subfolder == "Blogs/Acme"
     assert config.output_dir == (tmp_path / "public/blog").resolve()
     assert config.template_dir == (tmp_path / "blog-templates").resolve()
     assert config.assets_dir == (tmp_path / "public/blog/static").resolve()
     assert config.attachments_subfolder == "_files"
     assert config.paginate == 5
-    assert config.default_author == "DataHero Team"
+    assert config.default_author == "Acme Team"
     assert config.templates == {
         "base": "templates/blog-base.html",
         "post_card": "templates/_post_card.html",
     }
     assert config.shortcodes == {
-        "datahero-chart": "blog-templates/shortcodes/datahero-chart.html",
+        "acme-chart": "blog-templates/shortcodes/acme-chart.html",
     }
     assert config.pygments_style == "monokai"
     assert config.site == SiteMetaConfig(
-        title="DataHero Blog",
+        title="Acme Blog",
         description="Writing on data viz",
-        base_url="https://datahero.com/blog",
+        base_url="https://acme.com/blog",
         locale="en_GB",
-        twitter_handle="@datahero",
+        twitter_handle="@acme",
         default_image="og-default.png",
     )
     assert config.features == FeaturesConfig(
@@ -163,6 +163,21 @@ def test_missing_config_file_raises_config_error(tmp_path: Path) -> None:
 
 def test_invalid_paginate_type_raises(tmp_path: Path) -> None:
     body = MINIMAL_CONFIG + "paginate: ten\n"
+    _write_config(tmp_path, body)
+    with pytest.raises(ConfigError) as exc:
+        load_site_config(tmp_path)
+    assert "paginate" in str(exc.value)
+
+
+def test_paginate_zero_means_unlimited(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + "paginate: 0\n"
+    _write_config(tmp_path, body)
+    config = load_site_config(tmp_path)
+    assert config.paginate == 0
+
+
+def test_negative_paginate_raises(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + "paginate: -1\n"
     _write_config(tmp_path, body)
     with pytest.raises(ConfigError) as exc:
         load_site_config(tmp_path)

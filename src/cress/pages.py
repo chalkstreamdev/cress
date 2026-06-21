@@ -260,9 +260,17 @@ def _paginate(
     ctx: PageContext,
     extra_context: dict[str, Any],
 ) -> list[OutputFile]:
-    """Chunk ``items`` into pages of size ``paginate`` and render each."""
-    page_size = ctx.config.paginate
-    total = max(1, (len(items) + page_size - 1) // page_size)
+    """Chunk ``items`` into pages of size ``paginate`` and render each.
+
+    ``paginate == 0`` means unlimited: a single page holding every item, with no
+    ``/page/N/`` splits.
+    """
+    if ctx.config.paginate <= 0:
+        page_size = max(1, len(items))
+        total = 1
+    else:
+        page_size = ctx.config.paginate
+        total = max(1, (len(items) + page_size - 1) // page_size)
     outs: list[OutputFile] = []
     prefix = f"{path_prefix}/" if path_prefix else ""
     url_pfx = ctx.config.url_prefix
