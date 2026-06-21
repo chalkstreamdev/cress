@@ -1,7 +1,35 @@
-# cress
+# Cress: A markdown static site and blog generator.
 
-Publish an Obsidian vault to a static HTML blog that lives under a product repo's `/blog` path. No runtime, no server — just HTML files the product's existing static host can serve.
+Cress is a highly opinionated, Obsidian-vault-to-static site generator for blogs and documentation. 
 
+Why you might want to use cress: If you have a similar tech stack to us -- Django on the backend,
+Vue/React on the frontend -- and want to lean on Obsidian's great tooling to write blog posts. 
+
+Cress was built specifically for our pipeline at Chalkstream, where we write all our documentation
+as simple markdown in Obsidian vaults. Marrying these together into a static site generator made 
+sense for us over other solutions (Hugo, Astro) which would require more code to fit into our 
+specific pipeline. 
+
+Markdown files are rendered as HTML templates. A single yaml file defines the configuration of the
+site. Front matter on `.md` defines page title, subtitle, image, tags and categorization. 
+
+Cress doesn't ship with a theme: it is unstyled by design. The idea is that it drops into your existing 
+site's templates. Cress reads your existing build tool's Vite manifest to link to your stylesheets.
+
+Out of the box there is automatic support for embedded images (hoisted from the attachments folder
+of the Obsidian vault), Wikilinks to other posts, in-line tags, header anchors, and 
+Obsidian-flavored callout boxes. A flexible plugin system allows any project to build simple python
+plugins that can hook into shortcodes in the markdown.
+
+Vaults can be converted into blogs, which generates a latest-first list of paginated posts, category
+and tag pages, and an RSS Feed. Or you can create static pages, useful for documentation or 
+user manuals, which builds a full tree-based hierarchy and breadcrumb navigation.  All posts are 
+marked up with correct meta tags and Open Graph properties.
+
+An included `cress serve` will build your full vault and let you browse files locally. An optional
+`--live-reload` will rebuild the blog whenever markdown files or templates change. You can also use cress
+directly to stage and commit the blog and push it to your live site in one command.
+ 
 ## Install
 
 ```bash
@@ -114,7 +142,7 @@ default_author: "Author"
 static_pages: false                   # true → evergreen docs mode (see below)
 
 templates:
-  base: "templates/blog-base.html"
+  post: "blog-templates/my-post.html"   # repoint a page type; see "Templates" below
 
 shortcodes:
   youtube: "templates/shortcodes/youtube.html"
@@ -163,6 +191,59 @@ For Tailwind to scan cress's output for utility classes used in markdown bodies,
 ```
 
 esbuild and webpack manifests have different shapes — open an issue if you need them; the dispatch behind `vite_manifest` is straightforward to extend.
+
+## Templates
+
+cress ships a full set of templates under `defaults/` (`base.html`, `post.html`, `index.html`, `tag.html`, `category.html`, `tag_list.html`, `category_list.html`, the `_meta`/`_nav`/`_breadcrumbs`/`_pagination`/`_post_card` partials, and `sitemap.xml`). These are **real, working templates** — every build renders from them — they're just unstyled, emitting semantic HTML with correct meta tags and Open Graph properties so they inherit your site's CSS. They are not throwaway demos; they're the layer you customise.
+
+Point cress at your own templates with `template_dir` in the config:
+
+```yaml
+template_dir: "blog-templates"   # relative to the target repo
+```
+
+That directory is searched **before** the shipped defaults. From there you have three ways to customise, and they compose freely:
+
+### 1. Extend a default (recommended)
+
+Every shipped page template extends `defaults/base.html` and exposes the blocks `title`, `meta`, `content`, `extra_head`, and `footer`. The shipped `defaults/` are always on the search path, so your template can extend the shipped base and override only the blocks you need:
+
+```django
+{# blog-templates/my-post.html #}
+{% extends "defaults/base.html" %}
+{% block title %}{{ page.title }} — {{ site.title }}{% endblock %}
+{% block content %}
+  <article class="prose">
+    <h1>{{ page.title }}</h1>
+    <div class="post-body">{{ page.html|safe }}</div>
+  </article>
+{% endblock %}
+```
+
+Then repoint the page type at it via the `templates:` map (see below), or name it `defaults/post.html` to shadow the default outright (see method 3).
+
+### 2. Repoint a page type (`templates:` config map)
+
+Each page type resolves to `defaults/<type>.html` unless you override its name in the `templates:` map:
+
+```yaml
+templates:
+  post: "blog-templates/my-post.html"
+  index: "blog-templates/landing.html"
+```
+
+Recognised keys: `post`, `index`, `tag`, `category`, `tag_list`, `category_list`, and `sitemap`. (RSS is generated programmatically via feedgen and is not a template.) The path is resolved against `template_dir` first, then the shipped defaults.
+
+### 3. Shadow a default (override by same name)
+
+Because `template_dir` is searched first, dropping a file at the **same relative name** as a shipped template overrides it everywhere it's referenced — including the base layout and partials, which the `templates:` map can't reach. For example, to replace the base layout for the whole site:
+
+```
+blog-templates/defaults/base.html      # shadows the shipped base everywhere
+blog-templates/defaults/_meta.html     # shadows just the <head> meta partial
+```
+
+This is the only way to override `base.html` and the partials — there is no `base` key in the `templates:` map.
 
 ## Static pages mode
 
