@@ -286,11 +286,17 @@ def serve(
 
 
 def _watch_roots(site: cress) -> list[Path]:
-    return [
+    roots = [
         site.vault / site.config.vault_subfolder,
         site.vault / site.config.attachments_subfolder,
         site.target / ".cress" / "plugins",
     ]
+    # Watch consumer template overrides too, so editing a template during
+    # ``cress serve`` triggers a rebuild + live reload (the packaged default
+    # templates aren't watched — they don't change during development).
+    if site.config.template_dir is not None:
+        roots.append(site.config.template_dir)
+    return roots
 
 
 def _emit_serve_url(port: int, url_prefix: str, json_output: bool) -> None:

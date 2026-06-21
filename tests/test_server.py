@@ -18,8 +18,40 @@ from cress.server import (
     _make_handler,
     _QuietHTTPServer,
     _ReloadBus,
+    _watch_roots,
     inject_live_reload,
 )
+from cress.site import cress
+
+_CONFIG_NO_TEMPLATE_DIR = """\
+vault_subfolder: "Blogs/Demo"
+output_dir: "out"
+site:
+  title: "T"
+  description: "D"
+  base_url: "https://x.test"
+"""
+
+_CONFIG_WITH_TEMPLATE_DIR = """\
+vault_subfolder: "Blogs/Demo"
+output_dir: "out"
+template_dir: "templates"
+site:
+  title: "T"
+  description: "D"
+  base_url: "https://x.test"
+"""
+
+
+def _set_up_site(tmp_path: Path, config: str) -> cress:
+    vault = tmp_path / "vault"
+    (vault / "Blogs/Demo").mkdir(parents=True)
+    (vault / "_attachments").mkdir()
+    target = tmp_path / "target"
+    (target / ".cress").mkdir(parents=True)
+    (target / ".cress" / "config.yaml").write_text(config, encoding="utf-8")
+    (target / "out").mkdir()
+    return cress(vault, target)
 
 
 def test_inject_live_reload_adds_script_before_body_close() -> None:
@@ -47,6 +79,20 @@ def test_reload_bus_broadcasts_to_subscribers() -> None:
         raise AssertionError("expected q1 to receive no further events after unsubscribe")
     except queue.Empty:
         pass
+
+
+def test_watch_roots_includes_template_dir_when_configured(tmp_path: Path) -> None:
+    site = _set_up_site(tmp_path, _CONFIG_WITH_TEMPLATE_DIR)
+    roots = _watch_roots(site)
+    assert site.config.template_dir is not None
+    assert site.config.template_dir in roots
+
+
+def test_watch_roots_omits_template_dir_when_unset(tmp_path: Path) -> None:
+    site = _set_up_site(tmp_path, _CONFIG_NO_TEMPLATE_DIR)
+    roots = _watch_roots(site)
+    assert site.config.template_dir is None
+    assert None not in roots
 
 
 def _find_free_port() -> int:
