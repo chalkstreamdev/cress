@@ -1,15 +1,24 @@
-"""Smoke tests — package imports and CLI reports its four subcommands."""
+"""Smoke tests — package imports and CLI exposes its four subcommands."""
 
-from typer.testing import CliRunner
+import pytest
+from typer.main import get_command
 
 import cress
 from cress.cli import app
 
-# Pin a wide terminal so Rich renders full option names. Without this the help
-# panel is laid out for whatever width the ambient terminal reports (80 in CI),
-# and Rich truncates long option names (``--target`` → ``--targ…``), breaking
-# substring assertions. The width travels via os.environ inside ``invoke``.
-_WIDE = {"COLUMNS": "200"}
+
+def _option_flags(command_name: str) -> set[str]:
+    """Return the registered option flags (e.g. ``--target``) of a subcommand.
+
+    Introspects the Click command directly rather than scraping ``--help``
+    output: Typer renders help via Rich, which syntax-highlights option names
+    and so interleaves ANSI escapes through a token like ``--target`` whenever
+    colour is forced on (as CI does). That breaks naive substring assertions on
+    the rendered text while telling us nothing about the actual CLI contract.
+    """
+    group = get_command(app)
+    command = group.commands[command_name]  # type: ignore[attr-defined]
+    return {flag for param in command.params for flag in param.opts}
 
 
 def test_package_importable() -> None:
@@ -22,37 +31,11 @@ def test_package_exposes_public_api() -> None:
     assert cress.SiteConfig is not None
 
 
-def test_cli_help_lists_four_subcommands() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["--help"], env=_WIDE)
-    assert result.exit_code == 0
-    for name in ("build", "validate", "serve", "publish"):
-        assert name in result.stdout
+def test_cli_exposes_four_subcommands() -> None:
+    group = get_command(app)
+    assert set(group.commands) >= {"build", "validate", "serve", "publish"}  # type: ignore[attr-defined]
 
 
-def test_cli_build_help() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["build", "--help"], env=_WIDE)
-    assert result.exit_code == 0
-    assert "--target" in result.stdout
-
-
-def test_cli_validate_help() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["validate", "--help"], env=_WIDE)
-    assert result.exit_code == 0
-    assert "--target" in result.stdout
-
-
-def test_cli_serve_help() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["serve", "--help"], env=_WIDE)
-    assert result.exit_code == 0
-    assert "--target" in result.stdout
-
-
-def test_cli_publish_help() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["publish", "--help"], env=_WIDE)
-    assert result.exit_code == 0
-    assert "--target" in result.stdout
+@pytest.mark.parametrize("command", ["build", "validate", "serve", "publish"])
+def test_cli_command_has_target_option(command: str) -> None:
+    assert "--target" in _option_flags(command)
