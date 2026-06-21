@@ -2,7 +2,7 @@
 
 Guidance for Claude Code when working in the `cress` repository.
 
-`cress` is a Python CLI + library that publishes an Obsidian vault to a static HTML blog under a product repo's `/blog` path. It's a standalone tool that lives outside the DataHero monorepo and is intended to be reusable by any product that wants Obsidian-authored content on a static site.
+`cress` is a Python CLI + library that publishes an Obsidian vault to a static HTML blog under a product repo's `/blog` path. It's a standalone, self-contained tool intended to be reusable by any product that wants Obsidian-authored content on a static site.
 
 The authoring spec and bootstrap plan live in this repo:
 

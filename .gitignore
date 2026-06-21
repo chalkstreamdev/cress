@@ -15,3 +15,10 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Editor / IDE
+.idea/
+.vscode/
+
+# Obsidian vault config (docs/ is authored as an Obsidian vault)
+.obsidian/

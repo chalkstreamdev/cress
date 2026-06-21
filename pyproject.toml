@@ -1,12 +1,35 @@
 [project]
 name = "cress"
 version = "0.1.0"
-description = "Publish an Obsidian vault to a static HTML blog."
+description = "Publish an Obsidian vault to a static HTML blog or docs site."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "nick", email = "nick@chalkstream.dev" }
 ]
 requires-python = ">=3.14"
+keywords = [
+    "obsidian",
+    "static-site-generator",
+    "blog",
+    "markdown",
+    "ssg",
+    "wikilinks",
+    "documentation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Text Processing :: Markup :: Markdown",
+    "Typing :: Typed",
+]
 dependencies = [
     "django>=6.0",
     "feedgen>=1.0.0",
@@ -18,6 +41,12 @@ dependencies = [
     "typer>=0.24.1",
     "watchdog>=6.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/chalkstreamdev/cress"
+Repository = "https://github.com/chalkstreamdev/cress"
+Issues = "https://github.com/chalkstreamdev/cress/issues"
+Changelog = "https://github.com/chalkstreamdev/cress/blob/master/CHANGELOG.md"
 
 [project.scripts]
 cress = "cress.cli:main"
