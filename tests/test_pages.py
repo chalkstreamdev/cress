@@ -128,6 +128,38 @@ def test_render_index_pages_paginates(ctx: PageContext) -> None:
     # 25 posts / 10 per page = 3 pages (10, 10, 5)
 
 
+def test_paginate_zero_renders_single_unlimited_page(site_config: SiteConfig) -> None:
+    unlimited_cfg = _replace(site_config, paginate=0)
+    engine = build_engine(unlimited_cfg, PluginRegistry())
+    unlimited_ctx = PageContext(
+        config=unlimited_cfg,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+    )
+    posts = [(_post(f"p{i:02d}", d=date(2026, 4, i + 1)), "") for i in range(25)]
+    outs = render_index_pages(posts, unlimited_ctx)
+    paths = [o.relative_path for o in outs]
+    # Everything on one page — no /page/N/ splits — and every post is present.
+    assert paths == ["index.html"]
+    html = outs[0].content
+    for i in range(25):
+        assert f"p{i:02d}" in html
+
+
+def test_paginate_zero_with_no_posts_is_safe(site_config: SiteConfig) -> None:
+    unlimited_cfg = _replace(site_config, paginate=0)
+    engine = build_engine(unlimited_cfg, PluginRegistry())
+    unlimited_ctx = PageContext(
+        config=unlimited_cfg,
+        engine=engine,
+        now=datetime(2026, 4, 21, 12, 0, 0),
+        cress_version="0.0.1",
+    )
+    outs = render_index_pages([], unlimited_ctx)
+    assert [o.relative_path for o in outs] == ["index.html"]
+
+
 def test_static_index_sorts_by_url_path(site_config: SiteConfig) -> None:
     static_cfg = _replace(site_config, static_pages=True)
     engine = build_engine(static_cfg, PluginRegistry())

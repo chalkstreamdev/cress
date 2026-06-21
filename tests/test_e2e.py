@@ -46,7 +46,7 @@ git:
 _DEMO_PLUGIN = """
 from cress import plugin
 
-@plugin.shortcode('datahero-chart')
+@plugin.shortcode('acme-chart')
 def render_chart(body, **ctx):
     return '<figure class="chart">' + body.strip() + '</figure>'
 
@@ -102,7 +102,7 @@ def fixture(tmp_path: Path) -> tuple[Path, Path]:
         "---\ntitle: Chart Details\nslug: chart-details\ndate: 2026-04-11\n"
         "tags: [charts]\ncategories: [engineering]\n---\n"
         "Inline ![alt](inline.png) image here.\n\n"
-        "```datahero-chart\nid: 42\n```\n",
+        "```acme-chart\nid: 42\n```\n",
         encoding="utf-8",
     )
     (posts / "unslugged.md").write_text(

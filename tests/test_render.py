@@ -14,7 +14,7 @@ def ctx() -> RenderContext:
 
 @pytest.fixture
 def ctx_with_chart() -> RenderContext:
-    return RenderContext(shortcode_names={"datahero-chart"}, pygments_style="default")
+    return RenderContext(shortcode_names={"acme-chart"}, pygments_style="default")
 
 
 def test_paragraph_renders(ctx: RenderContext) -> None:
@@ -83,8 +83,8 @@ def test_embed_with_alias_placeholder(ctx: RenderContext) -> None:
 
 def test_shortcode_fenced_block(ctx_with_chart: RenderContext) -> None:
     body = "id: x\nseries: y\n"
-    html = render_markdown_text(f"```datahero-chart\n{body}```\n", ctx_with_chart)
-    assert 'data-cress-shortcode="datahero-chart"' in html
+    html = render_markdown_text(f"```acme-chart\n{body}```\n", ctx_with_chart)
+    assert 'data-cress-shortcode="acme-chart"' in html
     encoded = base64.b64encode(body.encode("utf-8")).decode("ascii")
     assert f'data-cress-body="{encoded}"' in html
 
@@ -100,3 +100,40 @@ def test_hashtag_inside_code_block_not_converted_to_wikilink(ctx: RenderContext)
     html = render_markdown_text("```\n#tag here\n```\n", ctx)
     assert "data-cress-wikilink" not in html
     assert "data-cress-embed" not in html
+
+
+def test_callout_renders_with_type_and_title(ctx: RenderContext) -> None:
+    html = render_markdown_text("> [!warning] Heads up\n> Be **careful** here.\n", ctx)
+    assert 'class="callout callout-warning"' in html
+    assert "Heads up" in html
+    assert "callout-icon" in html
+    # body is parsed as markdown
+    assert "<strong>careful</strong>" in html
+
+
+def test_callout_type_aliases_map_to_canonical(ctx: RenderContext) -> None:
+    assert "callout callout-success" in render_markdown_text("> [!tip] x\n> y\n", ctx)
+    assert "callout callout-error" in render_markdown_text("> [!danger] x\n> y\n", ctx)
+    assert "callout callout-info" in render_markdown_text("> [!note] x\n> y\n", ctx)
+
+
+def test_callout_without_title_uses_type_label(ctx: RenderContext) -> None:
+    html = render_markdown_text("> [!success]\n> done\n", ctx)
+    assert "<span>Success</span>" in html
+
+
+def test_unknown_callout_type_falls_back_to_info(ctx: RenderContext) -> None:
+    html = render_markdown_text("> [!mystery] x\n> y\n", ctx)
+    assert "callout callout-info" in html
+
+
+def test_plain_blockquote_is_not_a_callout(ctx: RenderContext) -> None:
+    html = render_markdown_text("> just a normal quote\n", ctx)
+    assert "callout" not in html
+    assert "<blockquote>" in html
+
+
+def test_callout_fold_marker_is_ignored(ctx: RenderContext) -> None:
+    html = render_markdown_text("> [!info]+ Foldable\n> body\n", ctx)
+    assert 'class="callout callout-info"' in html
+    assert "Foldable" in html
