@@ -1,6 +1,6 @@
 [project]
 name = "cress"
-version = "0.1.0"
+version = "0.2.0"
 description = "Publish an Obsidian vault to a static HTML blog or docs site."
 readme = "README.md"
 license = "MIT"
