@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from typer.testing import CliRunner
@@ -156,6 +157,20 @@ def test_cli_validate_fix_writes_slug_and_returns_zero(
     assert result.exit_code == 0
     contents = src.read_text(encoding="utf-8")
     assert "slug: hello-world" in contents
+
+
+def test_cli_serve_passes_list_drafts(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: A\nslug: a\ndate: 2026-04-19\n---\nbody\n", encoding="utf-8"
+    )
+    runner = CliRunner()
+    with mock.patch("cress.server.serve") as srv:
+        result = runner.invoke(
+            app, ["serve", "--vault", str(vault), "--target", str(target), "--list-drafts"]
+        )
+    assert result.exit_code == 0
+    assert srv.call_args.kwargs["list_drafts"] is True
 
 
 def test_cli_validate_fix_json(fixture: tuple[Path, Path]) -> None:

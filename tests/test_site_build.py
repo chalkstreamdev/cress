@@ -203,6 +203,40 @@ def test_no_drafts_excludes_drafts(tmp_path: Path) -> None:
     assert not (out / "_drafts").exists()
 
 
+def test_list_drafts_lists_draft_in_index(tmp_path: Path) -> None:
+    vault, target = _set_up_fixture(
+        tmp_path,
+        extra_posts={
+            "secret.md": (
+                "---\ntitle: Secret\nslug: secret\ndate: 2026-04-20\ndraft: true\n---\nhidden\n"
+            ),
+        },
+    )
+    result = cress(vault, target).build(list_drafts=True)
+    assert result.errors == []
+    out = target / "out"
+    (draft_dir,) = (out / "_drafts").glob("*-secret")
+    index_html = (out / "index.html").read_text(encoding="utf-8")
+    assert f"/_drafts/{draft_dir.name}/" in index_html
+    # Feeds stay draft-free even when the index lists drafts.
+    assert "_drafts" not in (out / "sitemap.xml").read_text(encoding="utf-8")
+    assert "Secret" not in (out / "rss.xml").read_text(encoding="utf-8")
+
+
+def test_default_build_does_not_list_drafts_in_index(tmp_path: Path) -> None:
+    vault, target = _set_up_fixture(
+        tmp_path,
+        extra_posts={
+            "secret.md": (
+                "---\ntitle: Secret\nslug: secret\ndate: 2026-04-20\ndraft: true\n---\nhidden\n"
+            ),
+        },
+    )
+    cress(vault, target).build()
+    index_html = (target / "out" / "index.html").read_text(encoding="utf-8")
+    assert "_drafts" not in index_html
+
+
 def test_hook_lifecycle_ordering(tmp_path: Path) -> None:
     vault, target = _set_up_fixture(tmp_path)
     plugins_dir = target / ".cress" / "plugins"

@@ -207,6 +207,43 @@ def test_render_index_excludes_drafts(ctx: PageContext) -> None:
     assert "/draft/" not in html
 
 
+def test_render_index_list_drafts_links_draft_preview_url(ctx: PageContext) -> None:
+    posts = [
+        (_post("p1"), ""),
+        (_post("secret", draft=True), ""),
+    ]
+    outs = render_index_pages(posts, ctx, list_drafts=True)
+    html = outs[0].content
+    assert isinstance(html, str)
+    assert "/p1/" in html
+    # The draft links to its obscured preview URL, never its would-be published URL.
+    assert "/_drafts/" in html
+    assert "-secret/" in html
+    assert 'href="/secret/"' not in html
+
+
+def test_render_index_list_drafts_marks_only_draft_cards(ctx: PageContext) -> None:
+    posts = [
+        (_post("p1"), ""),
+        (_post("secret", draft=True), ""),
+    ]
+    outs = render_index_pages(posts, ctx, list_drafts=True)
+    html = outs[0].content
+    assert isinstance(html, str)
+    assert html.count("draft-badge") == 1
+
+
+def test_render_index_list_drafts_interleaves_by_date(ctx: PageContext) -> None:
+    posts = [
+        (_post("old", d=date(2026, 1, 1)), ""),
+        (_post("wip", d=date(2026, 5, 1), draft=True), ""),
+    ]
+    outs = render_index_pages(posts, ctx, list_drafts=True)
+    html = outs[0].content
+    assert isinstance(html, str)
+    assert html.index("-wip/") < html.index("/old/")
+
+
 def test_render_tag_pages_emits_pagination_when_needed(ctx: PageContext) -> None:
     tax = Taxonomy()
     warnings: list[BuildWarning] = []

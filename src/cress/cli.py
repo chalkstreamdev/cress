@@ -171,6 +171,10 @@ def serve(
     live_reload: Annotated[bool, typer.Option("--live-reload")] = False,
     drafts_only: Annotated[bool, typer.Option("--drafts-only")] = False,
     no_drafts: Annotated[bool, typer.Option("--no-drafts")] = False,
+    list_drafts: Annotated[
+        bool,
+        typer.Option("--list-drafts", help="List drafts in the article index (preview links)."),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Build once, serve the output directory, rebuild on source changes."""
@@ -188,6 +192,7 @@ def serve(
         live_reload=live_reload,
         drafts_only=drafts_only,
         no_drafts=no_drafts,
+        list_drafts=list_drafts,
         json_output=json_output,
     )
 

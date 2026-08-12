@@ -80,6 +80,7 @@ def _page_view(post: Post, config: SiteConfig, body_html: str = "") -> dict[str,
         "image_url": post.image,
         "image_alt": post.image_alt,
         "url": _post_url(post, config),
+        "draft": post.draft,
     }
 
 
@@ -166,21 +167,29 @@ def render_draft_page(post: Post, body_html: str, ctx: PageContext) -> OutputFil
 
 
 def render_index_pages(
-    posts_with_html: list[tuple[Post, str]], ctx: PageContext
+    posts_with_html: list[tuple[Post, str]], ctx: PageContext, *, list_drafts: bool = False
 ) -> list[OutputFile]:
     """Render the paginated ``/index.html`` + ``/page/N/index.html``.
 
     Blog mode sorts reverse-chronological by ``date``. Static-pages mode has no
     reliable date (it may be ``None``), so it sorts by ``url_path`` ascending —
     deterministic and date-free.
+
+    ``list_drafts`` (dev-preview only) also lists drafts, linked to their
+    obscured ``_drafts/`` preview URLs. Production builds leave it off so the
+    published index never references a draft.
     """
-    published = [(p, body) for p, body in posts_with_html if not p.draft and p.slug is not None]
+    listed = [
+        (p, body)
+        for p, body in posts_with_html
+        if (list_drafts or not p.draft) and p.slug is not None
+    ]
     if ctx.config.static_pages:
-        published.sort(key=lambda item: item[0].url_path)
+        listed.sort(key=lambda item: item[0].url_path)
     else:
-        published.sort(key=lambda item: _sort_date(item[0]), reverse=True)
+        listed.sort(key=lambda item: _sort_date(item[0]), reverse=True)
     return _paginate(
-        items=[_page_view(p, ctx.config, body) for p, body in published],
+        items=[_page_view(p, ctx.config, body) for p, body in listed],
         template_name=resolve_template_name("index", ctx.config),
         path_prefix="",
         ctx=ctx,

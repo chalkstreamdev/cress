@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -20,6 +21,7 @@ from cress.server import (
     _ReloadBus,
     _watch_roots,
     inject_live_reload,
+    serve,
 )
 from cress.site import cress
 
@@ -52,6 +54,14 @@ def _set_up_site(tmp_path: Path, config: str) -> cress:
     (target / ".cress" / "config.yaml").write_text(config, encoding="utf-8")
     (target / "out").mkdir()
     return cress(vault, target)
+
+
+def test_serve_threads_list_drafts_to_build() -> None:
+    site = mock.Mock()
+    site.build.side_effect = RuntimeError("stop after first build")
+    with pytest.raises(RuntimeError):
+        serve(site, list_drafts=True)
+    assert site.build.call_args.kwargs["list_drafts"] is True
 
 
 def test_inject_live_reload_adds_script_before_body_close() -> None:

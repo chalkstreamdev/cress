@@ -246,10 +246,11 @@ def serve(
     live_reload: bool = False,
     drafts_only: bool = False,
     no_drafts: bool = False,
+    list_drafts: bool = False,
     json_output: bool = False,
 ) -> None:
     """Build once, start the HTTP server, watch vault + plugin dirs, rebuild on change."""
-    result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
+    result = site.build(drafts_only=drafts_only, no_drafts=no_drafts, list_drafts=list_drafts)
     _emit_build(result, json_output)
 
     bus = _ReloadBus()
@@ -274,7 +275,9 @@ def serve(
             time.sleep(_DEBOUNCE_SECONDS)
             trigger.clear()
             try:
-                result = site.build(drafts_only=drafts_only, no_drafts=no_drafts)
+                result = site.build(
+                    drafts_only=drafts_only, no_drafts=no_drafts, list_drafts=list_drafts
+                )
                 bus.publish()
                 _emit_build(result, json_output)
             except Exception as exc:  # pragma: no cover — surfaced but non-fatal

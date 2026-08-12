@@ -126,7 +126,7 @@ vault: /Users/me/Obsidian/Main
 | --- | --- |
 | `cress build` | Renders the vault into `<output_dir>`. Continues past per-post errors (they surface as warnings). |
 | `cress validate` | Parses every post without writing. Exits non-zero on any issue. `--fix` writes missing slugs. |
-| `cress serve` | Builds once, serves `<output_dir>` on localhost, rebuilds on source changes. `--live-reload` reloads the browser. |
+| `cress serve` | Builds once, serves `<output_dir>` on localhost, rebuilds on source changes. `--live-reload` reloads the browser; `--list-drafts` adds drafts to the article index, linked to their unlisted preview URLs. |
 | `cress publish` | Builds, stages `<output_dir>` in the target repo, commits with the configured prefix, and optionally pushes. |
 
 Every command accepts `--config PATH` to build from an alternate config file (default `<target>/.cress/config.yaml`) — this is how one product repo hosts both a blog and a docs site (see [Static pages mode](#static-pages-mode)).
@@ -368,7 +368,7 @@ image: images/hero.png
 image_alt: "Chart picking UI"
 categories: [engineering, product]
 tags: [charts, defaults, ux]
-draft: false
+draft: false                      # true → builds only to an unlisted /_drafts/ preview URL
 canonical: https://example.com/x
 
 # static-pages navigation (ignored in blog mode)

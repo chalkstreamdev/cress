@@ -75,7 +75,9 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         self.target: Path = target
         self.config: SiteConfig = load_site_config(target, config_path)
 
-    def build(self, drafts_only: bool = False, no_drafts: bool = False) -> BuildResult:
+    def build(
+        self, drafts_only: bool = False, no_drafts: bool = False, list_drafts: bool = False
+    ) -> BuildResult:
         """Run the full build pipeline (steps numbered inline below)."""
         started = time.perf_counter()
         warnings: list[BuildWarning] = []
@@ -256,7 +258,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
                 page_outputs.append(render_draft_page(post, body_html, page_ctx))
             else:
                 page_outputs.append(render_post_page(post, body_html, page_ctx))
-        page_outputs.extend(render_index_pages(posts_with_html, page_ctx))
+        page_outputs.extend(render_index_pages(posts_with_html, page_ctx, list_drafts=list_drafts))
         page_outputs.extend(render_tag_pages(tag_tax, page_ctx))
         page_outputs.extend(render_category_pages(cat_tax, page_ctx))
         page_outputs.append(render_tag_list(tag_tax, page_ctx))
