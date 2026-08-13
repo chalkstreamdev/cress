@@ -4,12 +4,7 @@ Guidance for Claude Code when working in the `cress` repository.
 
 `cress` is a Python CLI + library that publishes an Obsidian vault to a static HTML blog under a product repo's `/blog` path. It's a standalone, self-contained tool intended to be reusable by any product that wants Obsidian-authored content on a static site.
 
-The authoring spec and bootstrap plan live in this repo:
-
-- **Spec:** `docs/specs/2026-04-19-cressbed-static-site-generator.md`
-- **Bootstrap plan:** `docs/plans/2026-04-20-cress-static-site-generator.md`
-
-Read both before doing any non-trivial work here. All future plans and specs go in `docs/plans/` and `docs/specs/` alongside them.
+Plans and specs go in `docs/plans/` and `docs/specs/` — see § Working conventions below.
 
 ## Philosophy
 
@@ -43,11 +38,8 @@ Complex work is broken into stages, documented in `docs/plans/YYYY-MM-DD-descrip
 **Status**: [Not Started | In Progress | Complete]
 ```
 
-- The date in the plan filename is the **creation date** (kebab-case description).
-- Update status as you progress.
-- When all stages are complete, move the file to `docs/plans/completed/` and rename it with the **completion date** (not the original creation date).
-- Higher-level designs (the "what and why") go in `docs/specs/YYYY-MM-DD-description-of-task.md`.
-- **No git branches, no worktrees.** All work happens on `master`.
+- Update each stage's status as you progress.
+- Naming, locations, and the completion workflow are in § Working conventions — planning and documentation, below.
 
 ### 2. Implementation Flow — Test-Driven Development (MANDATORY)
 
@@ -287,17 +279,66 @@ uv run cress serve --target tests/fixtures/e2e/product/ --live-reload
 - Stop after 3 failed attempts and reassess.
 - Delegate git authentication to the user's existing git setup — never wrap or store credentials.
 
-## Superpowers Plugin Overrides
+## Working conventions — planning and documentation
 
-These overrides take precedence over any instructions in the superpowers plugin skills:
+### Git
 
-- **No worktrees, no branches.** Do NOT use `superpowers:using-git-worktrees`. Do NOT create git branches. All work happens directly on `master`. Skip all worktree/branch setup and cleanup steps in `executing-plans`, `subagent-driven-development`, `brainstorming`, and `finishing-a-development-branch`.
-- **Plan file naming.** Plans MUST be saved as `docs/plans/YYYY-MM-DD-description-of-task.md` (creation date, kebab-case).
-- **Spec file naming.** Higher-level designs go in `docs/specs/YYYY-MM-DD-description-of-task.md`.
-- **Completed plans.** Move to `docs/plans/completed/YYYY-MM-DD-description-of-task.md` using the **completion date**, not the creation date.
-- **finishing-a-development-branch.** Not applicable — there are no branches. Skip this skill entirely.
-- **writing-plans — dependency analysis.** Before writing a plan, scan `docs/plans/` (including subdirectories) and `docs/specs/` for existing work that touches the same files. Every plan header MUST include `**Depends on:**` and `**Blocks:**` lines. When a plan is part of a sequence, include an `**Execution order:**` line.
-- **writing-plans — documentation review.** Every plan MUST end with an "Update Documentation" task that lists what docs need changing. If none, state that explicitly.
-- **executing-plans — documentation is mandatory.** Documentation update tasks are completion criteria, like tests.
-- **No git commits in plans or execution.** Plans MUST NOT include `git add` / `git commit` steps. When executing a plan, never run git commit commands — present the work for review instead.
-- **Task completion workflow.** When the user says "task completed" or "review complete", handle final housekeeping (move the plan file, update reference docs). Do NOT commit — leave that to the user.
+- **Claude never commits** — no `git add`, `git commit`, `git push`, `git merge`, or `git reset --hard`. Work is presented for review; the user commits.
+- **No branches, no worktrees.** All work happens directly on `master`.
+- **Moving or deleting a document uses plain `mv` / `rm`, never `git mv` / `git rm`** — both of those stage the change, and staging is the user's job. Nothing is lost: git detects the rename at commit time either way.
+- Plans must not contain commit steps.
+
+### Asking the user questions
+
+**Never use the `AskUserQuestion` tool.** It is unreliable in this terminal and truncates option
+text. Ask in plain prose at the end of a turn — a numbered list where there are options, the
+recommended one first and marked — then end the turn and wait. No spacing tricks or padding to
+work around the tool's rendering; there is no tool to work around.
+
+### Where documents live
+
+| Kind | Path | Date in filename |
+|---|---|---|
+| Implementation plan | `docs/plans/YYYY-MM-DD-description-of-task.md` | Creation date |
+| Completed plan | `docs/plans/completed/YYYY-MM-DD-description-of-task.md` | **Completion** date |
+| Spec / design (the "what and why") | `docs/specs/YYYY-MM-DD-description-of-task.md` | Creation date |
+
+Filenames are lowercase kebab-case throughout. Every document is date-prefixed — no exceptions,
+specs included. Standing reference documents (roadmaps, code style, deployment
+procedures) are *not* plans: they live at `docs/<name>.md` without a date prefix, and carry a
+`**Date:**` header line that gets bumped on each edit instead.
+
+### Writing a plan
+
+Before writing, scan `docs/plans/` (including `completed/`), `docs/specs/`, and `docs/` for
+existing material that touches the same files or systems. Then follow
+`../chalkstream.dev/docs/templates/planning/plan-template.md`. In particular:
+
+- The header must carry `**Depends on:**` and `**Blocks:**` lines — link related plans by relative path, or state "Nothing". When a plan is one of a sequence, add an `**Execution order:**` line. Record new dependencies in *both* directions: update the plan being depended on too.
+- Every plan ends with an **Update Documentation** task naming which docs change and how. If none are affected, say so explicitly. A plan without that task is incomplete.
+- Tasks are ordered so each one leaves the project working. Each task lists the files it touches and the tests that prove it.
+- Cross-repo relative links (`../../backgammondb/docs/…`) are normal and encouraged.
+- **Reuse audit.** Before writing a plan, read § Module layout above and search `src/cress/` for modules, pure functions, and dataclasses that overlap with the planned work. Each task that introduces new code must note what it reuses (e.g. "extends `SlugPlan`", "goes through the manifest writer"), or justify why a parallel implementation is simpler than extending the existing one. Prefer stdlib and already-declared dependencies over new ones.
+- **TDD applies to plans too.** Every task that produces code states its tests, and states them before its implementation steps — see § 2 Implementation Flow.
+
+### Executing a plan
+
+- Work task by task, in order. Update each task's status in the plan file as you go.
+- Documentation tasks are completion criteria, exactly like tests. A plan is not complete while its Update Documentation task is outstanding. Bump the `**Date:**` line on any doc you modify.
+- Present the finished work for review. Do not commit.
+
+### The four commands
+
+- `/brainstorm <topic>` — explores a problem in conversation, then writes it up as a spec in `docs/specs/`.
+- `/plan <name>` — writes an implementation plan in `docs/plans/`, after scanning for dependencies, reusable code, and affected documentation. Every code task states its tests first.
+- `/critique <name>` — deep review of a plan, spec, or research doc before executing it. It logs its outcome to the document's **Edit Summary** table and **Edit History** section.
+- `/complete-task` — housekeeping once the work is reviewed: moves the plan to `completed/` re-dated to today, cleans up companion files, fixes links, checks documentation, and appends a "Plan complete" entry to the Edit Summary and Edit History.
+
+All four live in `.claude/commands/`. Their canonical versions are in
+`../chalkstream.dev/docs/templates/planning/` — fix a bug there first, then copy it here.
+
+### Documentation style
+
+- Every doc opens with a title plus `**Date:**` / `**Status:**` / `**Scope:**` / `**Related:**` header lines, and links related docs by relative path.
+- Docs explain what **isn't obvious** — decisions, trade-offs, gotchas, blast radius, rejected alternatives — not what a tool's own documentation already covers.
+- Don't make assumptions: verify against the actual code, servers, and sibling repos before recording a fact. What gets written down here gets relied on later.

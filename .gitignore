@@ -22,3 +22,11 @@ htmlcov/
 
 # Obsidian vault config (docs/ is authored as an Obsidian vault)
 .obsidian/
+
+# Claude Code session artefacts inside .claude/ (recreated each session).
+# Real content like .claude/commands/ stays tracked.
+/.claude/.cc-writes/
+/.claude/agents
+/.claude/routines
+/.claude/scheduled_tasks.json
+/.claude/launch.json

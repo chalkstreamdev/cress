@@ -1,10 +1,12 @@
 ---
-description: Critique an implementation plan — e.g. /critique mtp-1.7-quick-filter
+description: Critique a plan, spec, or research doc — e.g. /critique quick-filter
 ---
 
 # Plan Critique
 
-You deeply review an implementation plan, identifying strengths and potential issues, then guide the user through resolving each issue interactively.
+You deeply review a plan, spec, or research document, identifying strengths and potential issues, then guide the user through resolving each issue interactively.
+
+**Never use the `AskUserQuestion` tool anywhere in this command** — it is unreliable in this terminal, and it truncates exactly the nuanced option text this command exists to present. Ask every question in plain text at the end of a turn, and end the turn. No spacing tricks, blank-line padding, or other formatting workarounds — plain prose, then stop.
 
 ## Instructions
 
@@ -13,9 +15,9 @@ You deeply review an implementation plan, identifying strengths and potential is
 Parse `$ARGUMENTS` to locate the plan file:
 
 - If it looks like a path (contains `/` or `.md`), read it directly
-- If it looks like a partial name (e.g. `quick-filter`, `mtp-1.7`, `chart-theme`), search `docs/plans/` recursively for a matching file
+- If it looks like a partial name (e.g. `wikilink-resolver`, `shortcodes`), search `docs/plans/` and `docs/specs/` recursively for a matching file
 - If multiple matches, list them and ask the user to pick one
-- If no argument provided, list recent plans in `docs/plans/` (excluding `completed/`) and ask which to critique
+- If no argument provided, list recent documents in `docs/plans/` and `docs/specs/` (excluding `completed/`) and ask which to critique
 
 ### 2. Read and Understand the Plan
 
@@ -86,7 +88,7 @@ Highlight the strengths of the plan — good architectural decisions, thorough t
 
 #### Issues Found
 
-If there are issues, present a numbered summary list. Each item should be one line with a severity tag:
+**Always list every issue found, in full, before asking the user anything.** Present a numbered summary list. Each item should be one line with a severity tag:
 
 - `[major]` — Could cause the implementation to fail or produce wrong results
 - `[moderate]` — Worth changing but not a blocker
@@ -109,22 +111,17 @@ No issues found.
 
 Add a row to the Edit Summary table: `| 2026-03-24 | No issues found | Clean pass |`
 
-Then use the `AskUserQuestion` tool to ask whether to step through issues (only when there are issues):
+When there ARE issues, end your turn (after the full issue list) by asking how to proceed, in plain text:
 
 ```
-AskUserQuestion({
-  questions: [{
-    question: "Shall we step through each issue with alternatives and recommendations?",
-    header: "Review",
-    multiSelect: false,
-    options: [
-      { label: "Step through issues", description: "Walk through each issue one at a time with fix options" },
-      { label: "Apply all recommended", description: "Auto-apply the recommended fix for every issue" },
-      { label: "Just show the summary", description: "I'll read the review and handle fixes myself" }
-    ]
-  }]
-})
+How would you like to proceed?
+
+1. **Step through issues** — walk through each one with alternatives and recommendations
+2. **Apply all recommended** — apply the recommended fix for every issue without stepping through
+3. **Just the summary** — you'll read the review and handle fixes yourself
 ```
+
+Wait for the user's reply before doing anything else. If they choose "Apply all recommended", skip section 5 and go straight to section 6, treating every issue's recommended fix as accepted.
 
 ### 5. Interactive Issue Resolution
 
@@ -133,29 +130,24 @@ If the user chose "Step through issues", work through each issue sequentially:
 For each issue:
 
 1. **Explain the issue** in detail — what's wrong, why it matters, what could go wrong
-2. **Present choices using `AskUserQuestion`** — always include the recommended fix first with `(Recommended)` in its label, plus a "Dismiss" and "Discuss more" option:
-3. **Make sure there are two line breaks (`\n\n`) at the start of the question** in `AskUserQuestion` — this prevents the last line of the explanation from being truncated in the UI.
+2. **Present choices in plain text** — a numbered list, with the recommended fix first and marked `(recommended)`, always followed by "Dismiss" and "Discuss more" options:
 
-Then ALWAYS write four carriage returns before asking the user. This must come before the horizontal rule that appears with AskUserQuestion.
 ```
-AskUserQuestion({
-  questions: [{
-    question: "How should we resolve: [brief issue description]?",
-    header: "Issue N",
-    multiSelect: false,
-    options: [
-      { label: "[Fix approach] (Recommended)", description: "[why this is the best option]" },
-      { label: "[Alternative approach]", description: "[trade-off]" },
-      { label: "Dismiss", description: "Not a real issue, move on" },
-      { label: "Discuss more", description: "I want to explore this further before deciding" }
-    ]
-  }]
-})
+### Issue N: [brief issue title]
+
+[Detailed explanation — what's wrong, why it matters, what could go wrong.]
+
+How should we resolve it?
+
+1. **[Fix approach]** (recommended) — [why this is the best option]
+2. **[Alternative approach]** — [trade-off]
+3. **Dismiss** — not a real issue, move on
+4. **Discuss more** — explore this further before deciding
 ```
 
-3. **Wait for the user's choice** — do not proceed until they respond
+3. **End your turn and wait for the user's choice** — do not proceed until they respond. Accept a number, an option name, or a free-form instruction as the answer.
 
-If the user picks "Discuss more", explore the topic conversationally, then re-present the choices with `AskUserQuestion` again (updated if the discussion revealed new options).
+If the user picks "Discuss more", explore the topic conversationally, then re-present the numbered choices (updated if the discussion revealed new options).
 
 After the user decides:
 - Note down the resolution
@@ -235,3 +227,4 @@ After editing, show a brief summary of what was changed:
 - Don't suggest changes that conflict with CLAUDE.md guidelines
 - Keep the interactive flow conversational — don't dump walls of text
 - If an issue is dismissed, respect that and move on
+- Never use `AskUserQuestion` — ask everything in plain text and wait for the reply

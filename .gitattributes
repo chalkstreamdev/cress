@@ -1,0 +1,3 @@
+# Line endings — keep markdown LF so cross-repo diffs work (see
+# chalkstream.dev/docs/planning-standards.md § 5)
+*.md text eol=lf
