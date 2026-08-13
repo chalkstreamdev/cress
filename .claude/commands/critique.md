@@ -37,6 +37,10 @@ Think deeply about the plan. Evaluate it across these dimensions:
 - Are there edge cases the plan misses?
 - Are the architectural decisions sound?
 
+**Accuracy**
+- Are factual claims — prices, version numbers, third-party behaviour, dates, external formats — verified, or asserted? Flag anything stated without a source.
+- If a claim can be cheaply checked (read the dependency, run the query, fetch the page), check it now rather than flagging it.
+
 **Completeness**
 - Are all necessary files identified?
 - Are there missing tasks or steps?
