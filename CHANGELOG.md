@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-18
+
+### Added
+
+- `cress index` subcommand: emits the vault's post list as structured data
+  without building the site — no vite-manifest dependency, no disk writes, so
+  a host app can run it before or during its own build. Human listing by
+  default (`<date>  <path>  <title>`); `--json` puts one record per post at
+  `result.posts` in the standard envelope (title, slug, prefix-relative
+  `path`, absolute `url`, dates, summary, author, tags, categories, reading
+  time, draft flag, content-hashed hero-image URL). Slugless posts get the
+  same slug `cress build` will write back later; `--drafts` opts drafts in
+  with their unlisted preview paths.
+- Public `cress.pages.post_path` / `post_url` helpers (previously private) for
+  code that needs a post's site-root-relative or prefix-applied URL.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added
@@ -44,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `template_global`, `hook`, `page`).
 - Manifest-tracked output writer so only cress-owned files are cleaned up.
 
-[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/chalkstreamdev/cress/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/chalkstreamdev/cress/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/chalkstreamdev/cress/releases/tag/v0.1.0
