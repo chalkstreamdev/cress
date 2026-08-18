@@ -128,6 +128,7 @@ vault: /Users/me/Obsidian/Main
 | `cress validate` | Parses every post without writing. Exits non-zero on any issue. `--fix` writes missing slugs. |
 | `cress serve` | Builds once, serves `<output_dir>` on localhost, rebuilds on source changes. `--live-reload` reloads the browser; `--list-drafts` adds drafts to the article index, linked to their unlisted preview URLs. |
 | `cress publish` | Builds, stages `<output_dir>` in the target repo, commits with the configured prefix, and optionally pushes. |
+| `cress index` | Emits the post list as structured data without building — for host-app integration. `--drafts` includes drafts; `--json` for the envelope. |
 
 Every command accepts `--config PATH` to build from an alternate config file (default `<target>/.cress/config.yaml`) — this is how one product repo hosts both a blog and a docs site (see [Static pages mode](#static-pages-mode)).
 
@@ -142,6 +143,52 @@ Every command accepts `--json` for a machine-readable envelope:
   "errors": []
 }
 ```
+
+### Machine-readable post index
+
+`cress index` answers "what posts exist?" without rendering anything — no vite manifest needed,
+no disk writes, so a host app can call it before or during its own build (a homepage
+latest-posts widget, an email digest, a deploy notification). Without `--json` it prints one
+post per line (`<date>  <path>  <title>`); with `--json` the envelope's `result.posts` holds
+one record per post:
+
+```json
+{
+  "version": 1,
+  "ok": true,
+  "result": {
+    "posts": [
+      {
+        "title": "Opening rolls, revisited",
+        "slug": "opening-rolls-revisited",
+        "path": "/blog/opening-rolls-revisited/",
+        "url": "https://example.com/blog/opening-rolls-revisited/",
+        "date": "2026-08-14",
+        "updated": null,
+        "summary": "First 160 chars or frontmatter summary…",
+        "author": "Nick",
+        "tags": ["study"],
+        "categories": [],
+        "reading_time_minutes": 3,
+        "draft": false,
+        "image": "/blog/assets/opening-rolls-revisited/3fa9c2d1-hero.png",
+        "image_alt": "Opening position heatmap"
+      }
+    ]
+  },
+  "warnings": [],
+  "errors": []
+}
+```
+
+`path` is prefix-relative (what a same-site consumer embeds in `<a href>`); `url` is absolute
+(what RSS emits — for cross-domain consumers). Posts sort newest-first (by `path` in static
+pages mode). A post whose frontmatter has no `slug:` yet gets the **same slug `cress build`
+will write back later** — the index computes it with the identical pure function, so emitted
+URLs are promises that build keeps. `image` is the content-hashed public URL the build will
+produce (`null` when absent or missing). Drafts are excluded unless `--drafts` is passed;
+included drafts carry their unlisted `_drafts/…` preview path and a ` [draft]` marker in the
+human listing.
 
 ## Configuration
 

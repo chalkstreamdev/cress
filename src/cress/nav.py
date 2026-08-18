@@ -65,7 +65,7 @@ def _titleize(segment: str) -> str:
 
 
 def _node_url(url_path: str, config: SiteConfig) -> str:
-    """Public URL for a page-backed node — mirrors :func:`cress.pages._post_url`."""
+    """Public URL for a page-backed node — mirrors :func:`cress.pages.post_url`."""
     return f"{config.url_prefix}/{url_path}/"
 
 

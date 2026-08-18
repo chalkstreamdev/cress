@@ -23,10 +23,45 @@ htmlcov/
 # Obsidian vault config (docs/ is authored as an Obsidian vault)
 .obsidian/
 
-# Claude Code session artefacts inside .claude/ (recreated each session).
-# Real content like .claude/commands/ stays tracked.
-/.claude/.cc-writes/
+# ----------------------------------------------------------------------
+# Claude Code leftovers — common block, identical in every Chalkstream
+# repo. Canonical copy + rationale: chalkstream.dev repo,
+# docs/claude-code-gitignore.md. Fix there first, then copy out.
+# ----------------------------------------------------------------------
+# Zero-byte stubs sandboxed sessions leave in the repo root: the sandbox
+# bind-mounts real HOME dotfiles over the project dir, and the empty
+# mount-point files survive it. gitignore can only match names — never
+# size or content — so they are listed by name. Drop a line if a repo
+# ever needs the real file tracked (.gitmodules for submodules,
+# .mcp.json for a project MCP config, .vscode as a real editor dir).
+/.bash_profile
+/.bashrc
+/.gitconfig
+/.gitmodules
+/.mcp.json
+/.profile
+/.ripgreprc
+/.vscode
+/.zprofile
+/.zshrc
+# The same mount stubs inside .claude/. Deliberately NOT listed:
+# commands/, skills/, settings.json — real tracked content in some repos.
 /.claude/agents
+/.claude/hooks
+/.claude/loop.md
+/.claude/output-styles
 /.claude/routines
-/.claude/scheduled_tasks.json
+/.claude/workflows
+# Per-session / per-machine Claude Code state.
+/.claude/.cc-writes/
 /.claude/launch.json
+/.claude/scheduled_tasks.json
+/.claude/scheduled_tasks.lock
+/.claude/settings.local.json
+# Claude browser-tool screenshot temps, and stray `nul` files from
+# Windows-style output redirects.
+--ref*
+--crop
+*--full-page*
+nul
+# ---------------------------- end common block ------------------------

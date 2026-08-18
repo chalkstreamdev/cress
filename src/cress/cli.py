@@ -1,4 +1,4 @@
-"""Typer CLI — the four ``cress`` subcommands.
+"""Typer CLI — the five ``cress`` subcommands.
 
 Thin wrapper over :class:`cress.site.cress`. Each command parses CLI flags,
 constructs a ``cress`` instance, and delegates.
@@ -14,6 +14,7 @@ import typer
 from cress.build_result import BuildResult
 from cress.config import load_user_config, resolve_vault
 from cress.exceptions import CressError
+from cress.index import build_post_index
 from cress.post import (
     Post,
     apply_slug_writebacks,
@@ -251,6 +252,44 @@ def publish(
             typer.echo("pushed")
     if result.errors:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def index(
+    target: Annotated[
+        Path, typer.Option(help="Target product repo (default: current directory).")
+    ] = Path("."),
+    vault: Annotated[Path | None, typer.Option(help="Obsidian vault root.")] = None,
+    config: Annotated[Path | None, _CONFIG_OPTION] = None,
+    drafts: Annotated[
+        bool, typer.Option("--drafts", help="Include drafts (with their preview paths).")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Emit the post list as structured data without building the site."""
+    try:
+        resolved_vault = _resolve_vault_option(vault, target, config)
+        site = cress(resolved_vault, target, config)
+        result = build_post_index(site.vault, site.config, include_drafts=drafts)
+    except CressError as exc:
+        raise _emit_hard_error(exc, json_output=json_output) from exc
+
+    if json_output:
+        typer.echo(
+            _json_envelope(
+                ok=True,
+                result={"posts": [e.to_json_dict() for e in result.entries]},
+                warnings=result.warnings,
+                errors=[],
+            )
+        )
+    else:
+        for warning in result.warnings:
+            typer.echo(f"warning: {warning.type}: {warning.file}: {warning.message}", err=True)
+        for entry in result.entries:
+            date_str = entry.date.isoformat() if entry.date is not None else "-"
+            marker = " [draft]" if entry.draft else ""
+            typer.echo(f"{date_str}  {entry.path}  {entry.title}{marker}")
 
 
 def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:

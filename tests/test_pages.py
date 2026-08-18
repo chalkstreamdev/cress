@@ -1,5 +1,6 @@
 """Tests for cress.pages — per-post, draft, index, tag, category page generation."""
 
+import hashlib
 import json
 from dataclasses import replace as _replace
 from datetime import date, datetime
@@ -14,7 +15,8 @@ from cress.pages import (
     PageContext,
     _base_context,
     _post_context,
-    _post_url,
+    post_path,
+    post_url,
     render_category_list,
     render_category_pages,
     render_draft_page,
@@ -95,7 +97,7 @@ def test_blog_post_path_unchanged(ctx: PageContext) -> None:
     post = _post("hello", title="Hello")
     out = render_post_page(post, "<p>body</p>", ctx)
     assert out.relative_path == "hello/index.html"
-    assert _post_url(post, ctx.config) == "/hello/"
+    assert post_url(post, ctx.config) == "/hello/"
 
 
 def test_static_post_writes_to_hierarchical_path(ctx: PageContext) -> None:
@@ -106,7 +108,18 @@ def test_static_post_writes_to_hierarchical_path(ctx: PageContext) -> None:
 
 def test_post_path_includes_folder(ctx: PageContext) -> None:
     post = _post("install", url_path="guides/install")
-    assert _post_url(post, ctx.config) == "/guides/install/"
+    assert post_url(post, ctx.config) == "/guides/install/"
+
+
+def test_post_path_published_is_url_path_wrapped_in_slashes() -> None:
+    post = _post("install", url_path="guides/install")
+    assert post_path(post) == "/guides/install/"
+
+
+def test_post_path_draft_carries_sha_token() -> None:
+    post = _post("s", draft=True)
+    token = hashlib.sha256(b"s").hexdigest()[:8]
+    assert post_path(post) == f"/_drafts/{token}-s/"
 
 
 def test_render_draft_page_path_stable(ctx: PageContext) -> None:
@@ -324,13 +337,13 @@ def _config_with_prefix(tmp_path: Path, prefix: str) -> SiteConfig:
 def test_post_url_applies_url_prefix(tmp_path: Path) -> None:
     cfg = _config_with_prefix(tmp_path, "/blog")
     post = _post("hello")
-    assert _post_url(post, cfg) == "/blog/hello/"
+    assert post_url(post, cfg) == "/blog/hello/"
 
 
 def test_post_url_no_prefix_unchanged(tmp_path: Path) -> None:
     cfg = _config_with_prefix(tmp_path, "")
     post = _post("hello")
-    assert _post_url(post, cfg) == "/hello/"
+    assert post_url(post, cfg) == "/hello/"
 
 
 def test_page_view_url_uses_prefix_in_post_render(tmp_path: Path) -> None:

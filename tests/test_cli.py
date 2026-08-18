@@ -173,6 +173,128 @@ def test_cli_serve_passes_list_drafts(fixture: tuple[Path, Path]) -> None:
     assert srv.call_args.kwargs["list_drafts"] is True
 
 
+def test_cli_index_human_lists_date_path_title(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: A\nslug: a\ndate: 2026-08-14\n---\nbody\n", encoding="utf-8"
+    )
+    (vault / "Blogs/Demo/b.md").write_text(
+        "---\ntitle: B\nslug: b\ndate: 2026-08-15\n---\nbody\n", encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["index", "--vault", str(vault), "--target", str(target)])
+    assert result.exit_code == 0
+    assert result.stdout.splitlines() == ["2026-08-15  /b/  B", "2026-08-14  /a/  A"]
+
+
+def test_cli_index_json_envelope_shape(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: A\nslug: a\ndate: 2026-08-14\n---\nbody\n", encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["index", "--vault", str(vault), "--target", str(target), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["version"] == 1
+    assert payload["ok"] is True
+    [record] = payload["result"]["posts"]
+    assert record["title"] == "A"
+    assert record["slug"] == "a"
+    assert record["path"] == "/a/"
+    assert record["url"] == "https://x.test/a/"
+    assert record["date"] == "2026-08-14"
+    assert record["draft"] is False
+
+
+def _index_draft_fixture(vault: Path) -> None:
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: A\nslug: a\ndate: 2026-08-14\n---\nbody\n", encoding="utf-8"
+    )
+    (vault / "Blogs/Demo/secret.md").write_text(
+        "---\ntitle: Secret\nslug: secret\ndate: 2026-08-15\ndraft: true\n---\nbody\n",
+        encoding="utf-8",
+    )
+
+
+def test_cli_index_excludes_drafts_by_default(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _index_draft_fixture(vault)
+    runner = CliRunner()
+    result = runner.invoke(app, ["index", "--vault", str(vault), "--target", str(target)])
+    assert result.exit_code == 0
+    assert "Secret" not in result.stdout
+
+
+def test_cli_index_drafts_flag_includes_marked(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _index_draft_fixture(vault)
+    runner = CliRunner()
+    result = runner.invoke(
+        app, ["index", "--vault", str(vault), "--target", str(target), "--drafts"]
+    )
+    assert result.exit_code == 0
+    draft_lines = [line for line in result.stdout.splitlines() if line.endswith(" [draft]")]
+    assert len(draft_lines) == 1
+    assert "-secret/" in draft_lines[0]
+
+
+def test_cli_index_duplicate_slugs_exit_1_json_ok_false(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: Same Title\ndate: 2026-08-14\n---\nbody\n", encoding="utf-8"
+    )
+    (vault / "Blogs/Demo/b.md").write_text(
+        "---\ntitle: Same Title\ndate: 2026-08-15\n---\nbody\n", encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["index", "--vault", str(vault), "--target", str(target), "--json"])
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert len(payload["errors"]) == 1
+
+
+def test_cli_index_empty_vault_exits_0_with_warning(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    runner = CliRunner()
+    result = runner.invoke(app, ["index", "--vault", str(vault), "--target", str(target), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["result"]["posts"] == []
+    assert [w["type"] for w in payload["warnings"]] == ["empty_vault"]
+
+
+def test_cli_index_config_option_selects_alternate_config(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    (vault / "Docs").mkdir()
+    (vault / "Docs/guide.md").write_text(
+        "---\ntitle: Guide\nslug: guide\n---\nbody\n", encoding="utf-8"
+    )
+    docs_config = (
+        'vault_subfolder: "Docs"\n'
+        'output_dir: "out-docs"\n'
+        "static_pages: true\n"
+        "site:\n"
+        '  title: "Docs"\n'
+        '  description: "D"\n'
+        '  base_url: "https://x.test/docs"\n'
+    )
+    alt = target / ".cress" / "docs.config.yaml"
+    alt.write_text(docs_config, encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["index", "--vault", str(vault), "--target", str(target), "--config", str(alt), "--json"],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    [record] = payload["result"]["posts"]
+    assert record["path"] == "/docs/guide/"
+    assert record["url"] == "https://x.test/docs/guide/"
+
+
 def test_cli_validate_fix_json(fixture: tuple[Path, Path]) -> None:
     vault, target = fixture
     src = vault / "Blogs/Demo/a.md"

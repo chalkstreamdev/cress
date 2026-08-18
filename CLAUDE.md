@@ -176,6 +176,7 @@ src/cress/
 ├── attachments.py   # attachment resolution + content-hashing
 ├── taxonomy.py      # tag/category normalisation
 ├── pages.py         # page-type generators (post, index, tag, ...)
+├── index.py         # read-only post index (cress index)
 ├── feeds.py         # rss + sitemap
 ├── shortcodes.py    # shortcode registry
 ├── plugins.py       # plugin discovery + decorator API
@@ -218,9 +219,9 @@ uv run ruff format .              # auto-format
 ### Running cress against a fixture
 
 ```bash
-uv run cress build --target tests/fixtures/e2e/product/
-uv run cress validate --target tests/fixtures/e2e/product/
-uv run cress serve --target tests/fixtures/e2e/product/ --live-reload
+uv run cress build --target tests/fixtures/e2e/vite-manifest/product/ --vault tests/fixtures/e2e/vite-manifest/vault
+uv run cress validate --target tests/fixtures/e2e/vite-manifest/product/ --vault tests/fixtures/e2e/vite-manifest/vault
+uv run cress serve --target tests/fixtures/e2e/vite-manifest/product/ --vault tests/fixtures/e2e/vite-manifest/vault --live-reload
 ```
 
 ## Documentation Standards

@@ -51,8 +51,11 @@ def _sort_date(post: Post) -> date | datetime:
     return post.date
 
 
-def _post_path(post: Post) -> str:
-    """Path relative to the site root (no ``url_prefix``) for canonical URLs and on-disk layout."""
+def post_path(post: Post) -> str:
+    """Path relative to the site root (no ``url_prefix``) for canonical URLs and on-disk layout.
+
+    Also consumed by :mod:`cress.index` for the paths/URLs it emits.
+    """
     assert post.slug is not None
     if post.draft:
         token = hashlib.sha256(post.slug.encode("utf-8")).hexdigest()[:8]
@@ -60,9 +63,12 @@ def _post_path(post: Post) -> str:
     return f"/{post.url_path}/"
 
 
-def _post_url(post: Post, config: SiteConfig) -> str:
-    """Public URL (``url_prefix`` applied). Used for hrefs rendered into HTML."""
-    return f"{config.url_prefix}{_post_path(post)}"
+def post_url(post: Post, config: SiteConfig) -> str:
+    """Public URL (``url_prefix`` applied). Used for hrefs rendered into HTML.
+
+    Also consumed by :mod:`cress.index` for the paths/URLs it emits.
+    """
+    return f"{config.url_prefix}{post_path(post)}"
 
 
 def _page_view(post: Post, config: SiteConfig, body_html: str = "") -> dict[str, Any]:
@@ -79,7 +85,7 @@ def _page_view(post: Post, config: SiteConfig, body_html: str = "") -> dict[str,
         "reading_time_minutes": post.reading_time_minutes,
         "image_url": post.image,
         "image_alt": post.image_alt,
-        "url": _post_url(post, config),
+        "url": post_url(post, config),
         "draft": post.draft,
     }
 
@@ -148,7 +154,7 @@ def _post_context(post: Post, body_html: str, ctx: PageContext, path: str) -> di
 def render_post_page(post: Post, body_html: str, ctx: PageContext) -> OutputFile:
     """Render ``<slug>/index.html`` for a published post."""
     assert post.slug is not None
-    path = _post_path(post)
+    path = post_path(post)
     context = _post_context(post, body_html, ctx, path)
     name = resolve_template_name("post", ctx.config)
     html = render_template(ctx.engine, name, context)
