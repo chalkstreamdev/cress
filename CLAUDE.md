@@ -315,7 +315,7 @@ Before writing, scan `docs/plans/` (including `completed/`), `docs/specs/`, and 
 existing material that touches the same files or systems. Then follow
 `../chalkstream.dev/docs/templates/planning/plan-template.md`. In particular:
 
-- The header must carry `**Depends on:**` and `**Blocks:**` lines — link related plans by relative path, or state "Nothing". When a plan is one of a sequence, add an `**Execution order:**` line. Record new dependencies in *both* directions: update the plan being depended on too.
+- The header is a bulleted list, one bullet per field. It must carry `**Depends on:**` and `**Blocks:**` bullets — link related plans by relative path, or state "Nothing". When a plan is one of a sequence, add an `**Execution order:**` bullet. A field with more than one entry puts each entry on its own nested bullet, never joined with " · " on one line. Record new dependencies in *both* directions: update the plan being depended on too.
 - Every plan ends with an **Update Documentation** task naming which docs change and how. If none are affected, say so explicitly. A plan without that task is incomplete.
 - Tasks are ordered so each one leaves the project working. Each task lists the files it touches and the tests that prove it.
 - Cross-repo relative links (`../../backgammondb/docs/…`) are normal and encouraged.
@@ -340,6 +340,7 @@ All four live in `.claude/commands/`. Their canonical versions are in
 
 ### Documentation style
 
-- Every doc opens with a title plus `**Date:**` / `**Status:**` / `**Scope:**` / `**Related:**` header lines, and links related docs by relative path.
+- Every doc opens with a title plus a bulleted header list — one bullet each for `**Date:**`, `**Status:**`, `**Scope:**`, and `**Related:**` — and links related docs by relative path. A field with several entries puts each on its own nested bullet.
 - Docs explain what **isn't obvious** — decisions, trade-offs, gotchas, blast radius, rejected alternatives — not what a tool's own documentation already covers.
 - Don't make assumptions: verify against the actual code, servers, and sibling repos before recording a fact. What gets written down here gets relied on later.
+- **Write in Simplified Technical English.** One idea per sentence, active voice, one term per concept, no idioms, and no bare reference labels such as "D6" — name the decision instead. The full rule set is [`../chalkstream.dev/docs/writing-standards.md`](../chalkstream.dev/docs/writing-standards.md).

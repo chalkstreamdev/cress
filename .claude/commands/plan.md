@@ -61,7 +61,7 @@ Do not ask what the code or docs can answer. Do not ask permission to proceed.
 Follow `plan-template.md` in `chalkstream.dev/docs/templates/planning/`. Non-negotiables:
 
 - **Filename:** `docs/plans/YYYY-MM-DD-description-of-task.md`, today's date, lowercase kebab-case.
-- **Header lines:** `**Date:**`, `**Status:**`, `**Scope:**`, `**Depends on:**`, `**Blocks:**`, `**Related:**`, plus `**Execution order:**` when this is one of a sequence. `Depends on` / `Blocks` take relative links or the literal word "Nothing".
+- **Header list:** a bulleted list, one bullet per field: `**Date:**`, `**Status:**`, `**Scope:**`, `**Depends on:**`, `**Blocks:**`, `**Related:**`, plus `**Execution order:**` when this is one of a sequence. A field with more than one entry puts each entry on its own nested bullet — never joined with " · " on one line, and never as bare lines, which Markdown renders as one paragraph. `Depends on` / `Blocks` take relative links or the literal word "Nothing".
 - **Edit Summary table** immediately after the header block, with one row: `| YYYY-MM-DD | Plan created | one line on the shape of the plan |`.
 - **Prose before tasks** — what's being built, what already exists that it assembles, and the decisions a reader would otherwise reverse-engineer. Not a restatement of the task list.
 - **Tasks ordered so each one leaves the project working.** Each names the files it touches, the steps, its tests, and what is observably true when it's done.
@@ -74,10 +74,28 @@ Tasks should be executable by a session that has read the plan and nothing else.
 was made during planning, state the decision *and* the alternative it beat — that's what stops it
 being re-opened mid-execution.
 
-### 5. Record the dependencies in both directions
+### 5. Record the dependencies and the spec's state
 
 If this plan depends on or blocks another, edit that other plan's header too. A dependency
 recorded on one side only is how sequencing gets lost.
+
+When the plan was written from a spec, record the plan in that spec's header — the spec's
+`Status` and `Plans` fields are how the specs index knows the spec now has a plan (see
+`planning-standards.md` § 2.1):
+
+- Add a nested bullet under `**Plans:**` linking the new plan, ending ` — active`. If the field still reads `None yet`, replace that with the bullet.
+- Set `**Status:**` to `Planned`, or to `Partly implemented` if another `Plans` bullet is already `complete`. Keep any useful free text after ` — `.
+- If `**Type:**` or `**Blocks:**` still carries a pointer to this plan (or to "the implementation plan"), move it into `Plans`: `Type` is the constant `Spec (what & why)`, and `Blocks` lists only other work that waits on the spec.
+- Bump the spec's `**Date:**` and add an Edit Summary row: `| YYYY-MM-DD | Plan written | Implementation plan linked: <plan filename> |`.
+- Link the spec under the plan's own `**Related:**` field, as the plan template shows.
+
+Then rebuild the specs index from the repo root:
+
+```bash
+python3 /mnt/x/SynologyDrive/Development/chalkstream/chalkstream.dev/scripts/build_specs_index.py
+```
+
+The script writes `docs/specs/README.md`; never edit that file by hand.
 
 ### 6. Report
 

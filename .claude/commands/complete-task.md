@@ -33,12 +33,20 @@ Rules:
 
 ### 3. Clean Up Related Files
 
-Delete associated files if they exist:
+1. **Task file** — Check for a `.tasks.json` file alongside the plan (e.g. `docs/plans/some-plan.md.tasks.json`). If it exists, `rm` it. The user commits the deletion along with the move in section 2.
+2. **Spec file** — Find the spec this plan implements and record the completion in its header. **The spec stays where it is — specs always stay.** A spec is standing reference for the *what and why* and outlives its plan; completion never deletes, moves, or re-dates it, and there is nothing to ask the user. Lookup order:
+   1. Grep `docs/specs/` for a `Plans` bullet that links this plan (by its old path) — the reliable inverse link.
+   2. Otherwise, the name match: a spec whose descriptive filename matches the plan's (e.g. plan `quick-filter` matches spec `quick-filter-design.md`), ignoring date prefixes. This covers plans written before the `Plans` field existed.
+   Do not use a `../specs/` link in the plan's own header: a plan's `Related` field often links several specs.
 
-1. **Task file** — Check for a `.tasks.json` file alongside the plan (e.g. `docs/plans/some-plan.md.tasks.json`). If it exists, `rm` it.
-2. **Spec file** — Check `docs/specs/` for a spec with a matching descriptive name (e.g. plan `quick-filter` matches spec `quick-filter-design.md`). Match on the descriptive portion, ignoring date prefixes. If found, **ask the user whether to delete it** — a spec that only restates the plan is noise once shipped, but one that still describes how the system works is standing reference.
+   When the spec is found, update its header (the rules are in `planning-standards.md` § 2.1):
+   - Change the plan's `Plans` bullet to end ` — complete YYYY-MM-DD` (today, the date in the new filename) and rewrite its link to the `completed/` path. Add the bullet if the spec has no `Plans` field yet, moving any plan pointer out of `Type` or `Blocks` at the same time.
+   - Set `**Status:**` to `Implemented` when every `Plans` bullet is `complete` (ignoring `rejected`), and to `Partly implemented` otherwise. Keep any useful free text after ` — `.
+   - Bump the spec's `**Date:**` and add an Edit Summary row: `| YYYY-MM-DD | Plan complete | <plan filename> completed |`.
 
-The user commits the deletions along with the move in section 2.
+   If the shipped work contradicts the spec, flag that in the Documentation Review (section 5) instead of editing the body.
+
+   **Cross-repo case:** when nothing here matches, grep the sibling repos' `docs/specs/` folders under `/mnt/x/SynologyDrive/Development/chalkstream/` for a `Plans` bullet that links this plan by its cross-repo path. If one is found, do not edit the other repo — flag it to the user with the exact bullet to change (cross-repo stale links are flagged, not fixed). That repo's `docs/specs/README.md` shows the plan as `active` until the user updates it.
 
 ### 4. Update Reference Documents
 
@@ -47,6 +55,7 @@ Search for documents that link to the old plan path and update them:
 1. **Other plans** — Check `Depends on:` / `Blocks:` lines in related plans that reference this one; update paths
 2. **Other docs** — Grep for the old filename across `docs/` and fix any broken links
 3. **Cross-repo links** — If the plan is referenced from sibling repos (grep the `docs/` folders of the other projects under `/mnt/x/SynologyDrive/Development/chalkstream/`), flag those stale links to the user rather than silently editing another repo
+4. **Specs index** — Rebuild `docs/specs/README.md` from the repo root: `python3 /mnt/x/SynologyDrive/Development/chalkstream/chalkstream.dev/scripts/build_specs_index.py`. Never edit that file by hand
 
 ### 5. Documentation Review
 
@@ -77,8 +86,9 @@ Before the hand-off, record the outcome in the plan itself (in its new `complete
 
 Report what was done:
 - Which file was moved and where
-- Which task/spec files were deleted (if any)
+- Whether a task file was deleted (companion specs always stay put)
 - Which reference documents were updated
+- Which spec was updated and its new `Status`, or which cross-repo spec bullet needs a hand edit
 - Any documentation gaps or stale cross-repo links found
 
 Then say: **"Ready for you to commit when you're happy."**

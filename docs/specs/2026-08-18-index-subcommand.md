@@ -1,15 +1,18 @@
 # Spec: `cress index` — machine-readable post index
 
-**Date:** 2026-08-18
-**Status:** Direction accepted (decisions D1–D7 below)
-**Type:** Spec (what & why) — the implementation plan is [`../plans/completed/2026-08-18-index-subcommand.md`](../plans/completed/2026-08-18-index-subcommand.md) (complete)
-**Scope:** A fifth CLI subcommand that emits the vault's post list as structured data without
-rendering the site. Covers the CLI shape, the output contract, and its semantics (drafts,
-duplicates, static-pages mode). Deliberately leaves out every consumer-side concern — how a host
-app ingests the output is the consumer's business.
-**Depends on:** [`../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md`](../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md) — settled the mechanism (its D1–D2): a cress subcommand consumed by a host-app build step
-**Blocks:** Nothing — the implementation plan ([`../plans/completed/2026-08-18-index-subcommand.md`](../plans/completed/2026-08-18-index-subcommand.md)) executed this design and is complete
-**Related:** [`../../../backgammondb/docs/blog.md`](../../../backgammondb/docs/blog.md) · `src/cress/cli.py` (envelope convention) · `src/cress/post.py` (`plan_slug_writebacks`) · `src/cress/attachments.py` (`plan_attachment`)
+- **Date:** 2026-09-12
+- **Status:** Implemented — complete 2026-08-18 (decisions D1–D7 below)
+- **Type:** Spec (what & why)
+- **Plans:**
+  - [`../plans/completed/2026-08-18-index-subcommand.md`](../plans/completed/2026-08-18-index-subcommand.md) — complete 2026-08-18
+- **Scope:** A fifth CLI subcommand that emits the vault's post list as structured data without rendering the site. Covers the CLI shape, the output contract, and its semantics (drafts, duplicates, static-pages mode). Deliberately leaves out every consumer-side concern — how a host app ingests the output is the consumer's business.
+- **Depends on:** [`../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md`](../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md) — settled the mechanism (its D1–D2): a cress subcommand consumed by a host-app build step
+- **Blocks:** Nothing
+- **Related:**
+  - [`../../../backgammondb/docs/blog.md`](../../../backgammondb/docs/blog.md)
+  - `src/cress/cli.py` (envelope convention)
+  - `src/cress/post.py` (`plan_slug_writebacks`)
+  - `src/cress/attachments.py` (`plan_attachment`)
 
 ## Edit Summary
 
@@ -18,6 +21,7 @@ app ingests the output is the consumer's business.
 | 2026-08-18 | Spec created | CLI shape, record schema, and semantics settled in brainstorm |
 | 2026-08-18 | Plan linked | Implementation plan written (`../plans/2026-08-18-index-subcommand.md`); header links updated |
 | 2026-08-18 | Implemented | Human line format settled (`<date>  <path>  <title>`); JSON contract implemented with no drift |
+| 2026-09-12 | Header retrofitted | Status set to Implemented; Plans field added; header converted to the bulleted list |
 
 ---
 

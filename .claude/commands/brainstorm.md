@@ -61,9 +61,9 @@ as conversation. Then end the turn.
 Follow `spec-template.md` in `chalkstream.dev/docs/templates/planning/`. Non-negotiables:
 
 - **Filename:** `docs/specs/YYYY-MM-DD-description-of-task.md`, today's date, lowercase kebab-case.
-- **Header lines:** `**Date:**`, `**Status:**`, `**Type:** Spec (what & why)`, `**Scope:**`, `**Depends on:**`, `**Blocks:**`, `**Related:**`.
+- **Header list:** a bulleted list, one bullet per field: `**Date:**`, `**Status:**`, `**Type:** Spec (what & why)`, `**Plans:**`, `**Scope:**`, `**Depends on:**`, `**Blocks:**`, `**Related:**`. A field with more than one entry puts each entry on its own nested bullet — never joined with " · " on one line, and never as bare lines, which Markdown renders as one paragraph. `Status` takes one of the six vocabulary phrases from `planning-standards.md` § 2.1 — `Exploring` or `Direction accepted` for a new spec. `Plans` starts as `None yet`; it is the only place the spec points at its own plans, so `Type` and `Blocks` carry no plan pointer.
 - **Edit Summary table** immediately after the header block.
-- **Numbered decisions** (`D1`, `D2`, …) so plans and later specs can reference them. Each states what was chosen, what it beat, and why in a sentence.
+- **Named decisions, numbered for linking** — the heading reads **Decision 1 — <short name>**, so a link has a stable target. In prose, refer to a decision by its name, never as a bare label such as "D1". Each states what was chosen, what it beat, and why in a sentence.
 - **A Rejected alternatives section** with the reason for each. This is the section that stops the same idea being re-litigated in six months.
 - **Open questions** and **Non-goals** sections, both real. "None" is an acceptable answer; an absent section isn't.
 
@@ -78,6 +78,14 @@ manifest, it never compiles or transforms stylesheets); **boundary-only validati
 defensive fallback chains; **`build` is lenient, `validate` is strict**; and the fact that cress is
 a public, reusable tool — a design that only works for one consumer's vault layout is the wrong
 design.
+
+Finally, rebuild the specs index so it picks up the new spec. From the repo root:
+
+```bash
+python3 /mnt/x/SynologyDrive/Development/chalkstream/chalkstream.dev/scripts/build_specs_index.py
+```
+
+The script writes `docs/specs/README.md`; never edit that file by hand.
 
 ### 5. Report
 
