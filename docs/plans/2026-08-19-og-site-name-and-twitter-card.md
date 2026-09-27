@@ -1,14 +1,19 @@
 # Implementation Plan: `og:site_name` and an ungated `twitter:card`
 
 - **Date:** 2026-08-19
-- **Status:** Ready to execute
-- **Scope:** Two defects in the shipped `<head>` meta partial — `twitter:card` gated behind an unrelated config field, and `og:site_name` never emitted at all. Covers `defaults/_meta.html`, one new optional `site:` field, their tests, and retiring the downstream workaround already in BackgammonDB. Deliberately does **not** touch `og:image` sizing, JSON-LD, or template resolution order.
+- **Status:** Executed — awaiting review
+- **Scope:** Two defects in the shipped `<head>` meta partial — `twitter:card` gated behind an unrelated config field, and `og:site_name` never emitted at all. Covers `defaults/_meta.html`, one new optional `site:` field, their tests, and the follow-through in every cress consumer: retiring the workaround in BackgammonDB and setting the site name in DataHero. Deliberately does **not** touch `og:image` sizing, JSON-LD, or template resolution order.
 - **Depends on:** Nothing
-- **Blocks:** Nothing in this repo. Task 3 (cross-repo) cannot start until Tasks 1–2 ship.
+- **Blocks:**
+  - The BackgammonDB `base.html` revert and config edits (Task 3). They cannot start until Tasks 1–2 ship, and must land in the same session — see Task 3 for why.
+  - The DataHero config edit (Task 3).
 - **Related:**
   - `src/cress/templates/defaults/_meta.html`
   - `src/cress/config.py`
   - [`../../../backgammondb/static-templates/base.html`](../../../backgammondb/static-templates/base.html) — carries the local workaround this plan retires
+  - [`../../../backgammondb/scripts/deploy.ps1`](../../../backgammondb/scripts/deploy.ps1) — the two cress invocations (lines 30 and 37)
+  - [`../../../datahero/frontend/packages/datahero-app/blog-templates/base.html`](../../../datahero/frontend/packages/datahero-app/blog-templates/base.html) — includes the stock partial unchanged
+  - [`../../../datahero/frontend/packages/datahero-app/.cress/config.yaml`](../../../datahero/frontend/packages/datahero-app/.cress/config.yaml) — gains `site.name`
   - [`completed/2026-08-18-index-subcommand.md`](completed/2026-08-18-index-subcommand.md)
 
 ## Edit Summary
@@ -16,6 +21,7 @@
 | Date | Changes | Summary |
 |------|---------|---------|
 | 2026-08-19 | Plan created | One optional config field, two template lines, a no-handle test fixture, and a cross-repo cleanup |
+| 2026-09-27 | 5 fixes | Added the DataHero consumer, replaced stale counts and commands with a check over every built page, stated the zero-window risk of the editable install, fixed header links and the CHANGELOG step |
 
 Two independent defects, both surfaced while auditing how BackgammonDB's blog and manual unfurl
 on social platforms.
@@ -31,8 +37,8 @@ Those two tags answer different questions. `twitter:card` declares the *card for
 on its own; `twitter:site` attributes the card to an account. Gating the format on the
 attribution means any site without an X account gets no `twitter:card` at all, so X renders a
 small square thumbnail even though cress already emitted a 1200x630 `og:image` for that page.
-That is every cress site whose config omits `twitter_handle` — including both BackgammonDB
-sites, 47 pages between them.
+That is every cress site whose config omits `twitter_handle` — which today is every consumer:
+both BackgammonDB sites and the DataHero blog.
 
 **`og:site_name` is never emitted.** No shipped template references it. Facebook, LinkedIn and
 Slack use it for the small attribution line above the card title; without it they fall back to
@@ -63,7 +69,7 @@ correct `og:site_name` for both is "BackgammonDB". So:
   would add bytes to every page for no behaviour change.
 - The unmapped `tag` / `category` templates in static-pages mode, which fall back to cress's own
   base and so miss any host `base.html` customisation entirely. A real issue, visible on
-  BackgammonDB's four orphan `/manual/tags/` pages, but a separate defect with a separate fix.
+  BackgammonDB's orphan `/manual/tags/` page, but a separate defect with a separate fix.
 
 **Tech Stack:** Python 3, cress's Django-template render engine, pytest, mypy strict, ruff.
 
@@ -77,7 +83,7 @@ so Task 2 edits the template then adds assertions; Task 1 is ordinary code and i
 
 ## Task 1: Add the optional `site.name` config field
 
-**Status:** Not started
+**Status:** Complete
 
 **Files:**
 - Modify: `src/cress/config.py`
@@ -119,7 +125,7 @@ name=_maybe(site_raw.get("name"), "site.name", _as_str),
 
 ## Task 2: Emit `og:site_name` and ungate `twitter:card`
 
-**Status:** Not started
+**Status:** Complete
 
 **Files:**
 - Modify: `src/cress/templates/defaults/_meta.html`
@@ -171,62 +177,88 @@ tags are void elements inside `{% spaceless %}` and must not disturb it.
 
 ---
 
-## Task 3: Retire the BackgammonDB workaround (cross-repo)
+## Task 3: Update the consumers (cross-repo)
 
-**Status:** Not started — blocked on Tasks 1–2
+**Status:** Complete — all three sites rebuilt locally on 2026-09-27; the per-page check passed on 27 + 29 + 20 pages. Not yet deployed.
 
 **Files:**
 - Modify: `../../../backgammondb/static-templates/base.html`
 - Modify: `../../../backgammondb/.cress/blog.config.yaml`
 - Modify: `../../../backgammondb/.cress/manual.config.yaml`
+- Modify: `../../../datahero/frontend/packages/datahero-app/.cress/config.yaml`
 
-BackgammonDB currently overrides `{% block meta %}` in its shared `base.html` to append exactly
-these two tags, as a workaround for the defects above. Once cress emits them, that override
-duplicates both on all 47 pages, so the two changes must land together.
+Three cress sites consume this repo: the BackgammonDB blog, the BackgammonDB manual, and the
+DataHero blog. None sets `twitter_handle`, so all three are hit by both defects.
 
-**Step 1:** Revert the meta block in `static-templates/base.html` to the one-liner it was, and
-delete the `{% comment %}` block that explains the workaround:
+**Why this task and Task 2 land in one session.** Every consumer runs cress from this repo's
+venv through an editable install (`.venv/Lib/site-packages/cress.pth` points at `src/`).
+There is no version pin and no release gate: the moment Task 2 is saved, the next consumer
+build renders the new partial. BackgammonDB overrides `{% block meta %}` in its shared
+`base.html` to append exactly these two tags as a workaround, so from that moment until the
+override is removed, every BackgammonDB build duplicates both tags on every page. Do Task 2,
+then this task, then rebuild — all before any consumer deploy. Nick runs the deploys.
+
+**Step 1 — BackgammonDB: revert the workaround.** Restore the meta block in
+`static-templates/base.html` to the one-liner it was, and delete the `{% comment %}` block
+that explains the workaround:
 
 ```html
 {% block meta %}{% include "defaults/_meta.html" %}{% endblock %}
 ```
 
-**Step 2:** Add `name: "BackgammonDB"` to the `site:` block of both `.cress` configs, so the two
-sites attribute to the product rather than to "BackgammonDB Blog" and "BackgammonDB Manual".
+**Step 2 — BackgammonDB: set the site name.** Add `name: "BackgammonDB"` to the `site:` block
+of both `.cress` configs, so the two sites attribute to the product rather than to
+"BackgammonDB Blog" and "BackgammonDB Manual".
 
-**Step 3:** Rebuild both sites. BackgammonDB runs cress from this repo's venv via an editable
-install (`.venv/Lib/site-packages/cress.pth`), so it picks up the `src/` changes with no
-reinstall or release:
+**Step 3 — DataHero: set the site name.** DataHero has no override to remove; its `base.html`
+includes the stock partial unchanged. Add `name: "DataHero"` to the `site:` block of
+`.cress/config.yaml`, for the same reason as BackgammonDB: without it the title fallback
+attributes every page to "DataHero Blog".
 
-```
-cmd.exe /c "..\cress\.venv\Scripts\cress.exe build --config .cress/blog.config.yaml && ..\cress\.venv\Scripts\cress.exe build --config .cress/manual.config.yaml"
-```
+**Step 4 — rebuild all three sites locally.** Use the consumers' own invocations rather than a
+copy typed into this plan, so the flags stay in step:
 
-**Tests:** no unit tests — this is configuration and a template revert, verified by inspecting
+- BackgammonDB: the two `cress.exe build` lines in `scripts/deploy.ps1` (lines 30 and 37),
+  run from the BackgammonDB repo root. Each passes `--config` and `--target .`.
+- DataHero: `pnpm build:blog` from `frontend/`, which calls this repo's `cress.exe` with
+  `--target packages/datahero-app`. It must run after `build:app` because Vite wipes `dist/`.
+
+These are local builds, not deploys.
+
+**Tests:** no unit tests — this is configuration and a template revert, verified by checking
 the build output.
 
-**Success criteria:** across `dist/blog` (20 pages) and `dist/manual` (27), every page carries
-exactly one `og:site_name` and one `twitter:card`, and `og:site_name` reads "BackgammonDB" on
-both sites. Confirm the count is 1 and not 2 on a sample page — duplication is the specific
-failure this task exists to prevent:
+**Success criteria:** every built page in all three sites carries exactly one `og:site_name`
+and exactly one `twitter:card`, and `og:site_name` reads "BackgammonDB" on both BackgammonDB
+sites and "DataHero" on DataHero. Duplication is the specific failure this task exists to
+prevent, and it can hit either tag on any page, so check every page rather than a sample.
+From the BackgammonDB repo root (for DataHero, substitute
+`frontend/packages/datahero-app/dist/blog`):
 
+```bash
+for f in $(find dist/blog dist/manual -name index.html); do
+  s=$(grep -c 'og:site_name' "$f"); c=$(grep -c 'twitter:card' "$f")
+  [ "$s" = 1 ] && [ "$c" = 1 ] || echo "$f: og:site_name=$s twitter:card=$c"
+done
 ```
-grep -c 'og:site_name' dist/blog/study-mode/index.html
-```
+
+No output means every page passes. Note that `dist/blog` also contains draft previews under
+`_drafts/`; they render through the same partial and are included on purpose.
 
 ---
 
 ## Task 4: Update Documentation
 
-**Status:** Not started
+**Status:** Complete
 
 - `README.md` — add `name: "My Product"` to the `site:` schema block (around line 214, beside
   `twitter_handle`), with a one-line note that it sets `og:site_name`, defaults to `title`, and
   earns its place when one product ships several cress sites. The claims at lines 27 and 278
   that the shipped templates emit "correct meta tags and Open Graph properties" need no edit —
   they become more true.
-- `CHANGELOG.md` — under `## [Unreleased]`, an `### Added` entry for `site.name` and a
-  `### Fixed` entry for the `twitter:card` gate. The Fixed entry must state the behaviour
+- `CHANGELOG.md` — under `## [Unreleased]`, append a `site.name` entry to the existing
+  `### Added` section (it already holds the `og_image` entry) and add a new `### Fixed` section
+  for the `twitter:card` gate. The Fixed entry must state the behaviour
   change plainly: sites configured without `twitter_handle` now emit `twitter:card` where they
   previously emitted none, so their X unfurls change from a small thumbnail to a large card.
 - `CLAUDE.md` — no change. No convention, command, or module boundary moved.
@@ -236,3 +268,12 @@ grep -c 'og:site_name' dist/blog/study-mode/index.html
 ## Edit History
 
 <!-- Created by /critique on its first pass, or by /complete-task at the end. Newest last. -->
+
+### 2026-09-27 — Critique
+
+**Fixes:**
+- **[major] DataHero blog missing from the plan** — DataHero is a third cress consumer with no `twitter_handle`, the stock meta partial, and no `og:site_name` on any of its built pages. Task 3 is now "Update the consumers" and gains a DataHero step: set `name: "DataHero"` and rebuild with `pnpm build:blog`.
+- **[moderate] Task 3 numbers and commands stale** — The 20/27/47 page counts and the "four orphan tag pages" no longer matched the builds, and the inline rebuild command omitted the `--target .` the real deploy script passes. Dropped every hard count, pointed the rebuild step at `scripts/deploy.ps1` lines 30 and 37 and `pnpm build:blog`, and added a paragraph stating that the editable install gives a zero-width window between Task 2 landing and BackgammonDB duplicating tags.
+- **[moderate] Verification too narrow** — One grep on one page for one tag. Replaced with a shell loop that checks every built `index.html` in all three sites for exactly one of each tag, silent on success.
+- **[minor] Header links incomplete** — "Blocks: Nothing in this repo" hid the cross-repo work, and Related omitted DataHero. Blocks now names both consumer edits; Related links the DataHero base template and config and the BackgammonDB deploy script.
+- **[minor] CHANGELOG step assumed an empty Unreleased** — The `### Added` section already exists for the `og_image` work. The step now says to append to it and add a new `### Fixed` section.

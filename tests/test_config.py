@@ -34,6 +34,7 @@ site:
   locale: "en_GB"
   twitter_handle: "@acme"
   default_image: "og-default.png"
+  name: "Acme"
 template_dir: "blog-templates"
 assets_dir: "public/blog/static"
 attachments_subfolder: "_files"
@@ -117,6 +118,7 @@ def test_full_config_round_trips_every_field(tmp_path: Path) -> None:
         locale="en_GB",
         twitter_handle="@acme",
         default_image="og-default.png",
+        name="Acme",
     )
     assert config.features == FeaturesConfig(
         rss=False, rss_count=50, sitemap=False, syntax_highlighting=False, json_ld=True
@@ -124,6 +126,19 @@ def test_full_config_round_trips_every_field(tmp_path: Path) -> None:
     assert config.git == GitConfig(
         auto_commit=True, auto_push=True, remote="deploy", commit_prefix="site:"
     )
+
+
+def test_site_name_parsed_when_present(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG + '  name: "Acme"\n')
+    config = load_site_config(tmp_path)
+    assert config.site.name == "Acme"
+
+
+def test_site_name_defaults_to_none_when_absent(tmp_path: Path) -> None:
+    """The template applies the title fallback, so the parsed value stays None."""
+    _write_config(tmp_path, MINIMAL_CONFIG)
+    config = load_site_config(tmp_path)
+    assert config.site.name is None
 
 
 def test_vault_subfolder_optional_defaults_to_whole_vault(tmp_path: Path) -> None:

@@ -1,5 +1,6 @@
 """Render-snapshot tests for shipped default templates — all must render cleanly."""
 
+from dataclasses import replace
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
@@ -42,6 +43,18 @@ def site() -> SiteMetaConfig:
         base_url="https://example.com/blog",
         locale="en_US",
         twitter_handle="@example",
+    )
+
+
+@pytest.fixture
+def site_without_handle() -> SiteMetaConfig:
+    """A site with no X account — the common case for cress consumers."""
+    return SiteMetaConfig(
+        title="Example",
+        description="An example blog",
+        base_url="https://example.com/blog",
+        locale="en_US",
+        twitter_handle=None,
     )
 
 
@@ -129,6 +142,52 @@ def test_post_html_renders_well_formed(
     assert 'rel="canonical"' in html
     assert 'article:tag" content="charts"' in html
     _assert_well_formed_html(html)
+
+
+def _render_post(engine, site: SiteMetaConfig, features: FeaturesConfig) -> str:
+    ctx: dict[str, object] = {
+        "site": site,
+        "features": features,
+        "page": _page(),
+        "now": date(2026, 4, 21),
+        "cress_version": "0.0.1",
+        "pygments_style": "default",
+        "canonical_url": "https://example.com/blog/smart-chart-defaults/",
+    }
+    return render_template(engine, "defaults/post.html", ctx)
+
+
+def test_meta_emits_twitter_card_without_handle(
+    engine, site_without_handle: SiteMetaConfig, features: FeaturesConfig
+) -> None:
+    """The card format stands on its own; only the attribution needs a handle."""
+    html = _render_post(engine, site_without_handle, features)
+    assert 'name="twitter:card" content="summary_large_image"' in html
+    assert "twitter:site" not in html
+
+
+def test_meta_emits_twitter_site_when_handle_set(
+    engine, site: SiteMetaConfig, features: FeaturesConfig
+) -> None:
+    html = _render_post(engine, site, features)
+    assert 'name="twitter:card" content="summary_large_image"' in html
+    assert 'name="twitter:site" content="@example"' in html
+
+
+def test_meta_site_name_falls_back_to_title(
+    engine, site: SiteMetaConfig, features: FeaturesConfig
+) -> None:
+    html = _render_post(engine, site, features)
+    assert 'property="og:site_name" content="Example"' in html
+
+
+def test_meta_site_name_prefers_explicit_name(
+    engine, site: SiteMetaConfig, features: FeaturesConfig
+) -> None:
+    named = replace(site, name="Example Product")
+    html = _render_post(engine, named, features)
+    assert 'property="og:site_name" content="Example Product"' in html
+    assert 'property="og:site_name" content="Example"' not in html
 
 
 def test_index_html_renders(engine, site: SiteMetaConfig, features: FeaturesConfig) -> None:

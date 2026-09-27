@@ -31,6 +31,9 @@ class SiteMetaConfig:
     locale: str = "en_US"
     twitter_handle: str | None = None
     default_image: str | None = None
+    # Product name for ``og:site_name``. The template falls back to ``title``
+    # when unset; set it when one product ships several cress sites.
+    name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +154,7 @@ def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfi
         locale=_as_str(site_raw.get("locale", "en_US"), "site.locale"),
         twitter_handle=_maybe(site_raw.get("twitter_handle"), "site.twitter_handle", _as_str),
         default_image=_maybe(site_raw.get("default_image"), "site.default_image", _as_str),
+        name=_maybe(site_raw.get("name"), "site.name", _as_str),
     )
 
     features_raw = raw.get("features", {})

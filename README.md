@@ -213,6 +213,8 @@ site:
   locale: "en_US"
   twitter_handle: "@myproduct"
   default_image: "og-default.png"
+  # og:site_name. Defaults to title; set it when one product ships several cress sites.
+  name: "My Product"
 
 # Optional
 template_dir: "blog-templates"
@@ -413,6 +415,7 @@ author: "Nick"
 summary: "One-liner for index and meta description"
 image: images/hero.png
 image_alt: "Chart picking UI"
+og_image: images/share-card.png   # social-share card; wins over image for og:image only
 categories: [engineering, product]
 tags: [charts, defaults, ux]
 draft: false                      # true → builds only to an unlisted /_drafts/ preview URL

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
+### Added
+
+- `og_image` post frontmatter field: a separate social-share card. It is
+  resolved through the attachment pipeline exactly like `image` (hashed,
+  staged, absolutized) and wins for the `og:image` tag only — the page hero
+  stays `image`. A missing file emits a `missing_og_image` warning.
+- `site.name` config field: the value of the new `og:site_name` meta tag,
+  which the shipped `_meta.html` now emits on every page. It defaults to
+  `site.title`, so single-site products configure nothing. Set it when one
+  product ships several cress sites, so each attributes to the product rather
+  than to its own title.
+
+### Fixed
+
+- `twitter:card` is no longer gated on `site.twitter_handle`. Sites configured
+  without a handle now emit `<meta name="twitter:card" content="summary_large_image">`
+  where they previously emitted no card declaration at all, so their X unfurls
+  change from a small square thumbnail to a large card. `twitter:site` stays
+  gated on the handle.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
@@ -60,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `template_global`, `hook`, `page`).
 - Manifest-tracked output writer so only cress-owned files are cleaned up.
 
-[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/chalkstreamdev/cress/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/chalkstreamdev/cress/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/chalkstreamdev/cress/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/chalkstreamdev/cress/releases/tag/v0.1.0
