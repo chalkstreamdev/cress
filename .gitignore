@@ -67,6 +67,8 @@ nul
 # ---------------------------- end common block ------------------------
 
 # Repo-local: Claude Code guidance stays on disk but out of the public repo
-# (untracked 2026-09-27 with `git rm --cached`).
+# (untracked 2026-09-27 with `git rm --cached`). Nothing under .claude/ is
+# tracked here, so the whole directory is ignored, which also covers the
+# settings.json and skills mount stubs the shared block leaves alone.
 /CLAUDE.md
-/.claude/commands/
+/.claude/
