@@ -1,3 +1,12 @@
-# Line endings — keep markdown LF so cross-repo diffs work (see
-# chalkstream.dev/docs/planning-standards.md § 5)
+# LF everywhere, for every text file. This tree is edited from both Windows and
+# WSL over /mnt/x. Windows git and the WSL global config both run
+# core.autocrlf=true, which warns on every add that LF "will be replaced by
+# CRLF". eol=lf beats autocrlf on both platforms, so the working copy and the
+# index stay LF and the warning stops. Same rule as backgammondb/.gitattributes.
+# text=auto lets git decide what is text, so an unlisted binary is still safe.
+* text=auto eol=lf
+
+# Markdown stays LF so planning docs diff cleanly against the other repos'
+# copies (see chalkstream.dev/docs/planning-standards.md § 5). Redundant under
+# the catch-all, kept because it states the reason.
 *.md text eol=lf
