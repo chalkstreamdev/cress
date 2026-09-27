@@ -333,6 +333,36 @@ def test_hero_image_is_routed_through_attachment_pipeline(tmp_path: Path) -> Non
     assert hashed[0].read_bytes() == b"hero-bytes"
 
 
+def test_og_image_is_routed_through_attachment_pipeline(tmp_path: Path) -> None:
+    """Frontmatter ``og_image:`` is staged like ``image:`` and its hashed URL
+    lands in the page's ``og:image`` tag."""
+    vault, target = _set_up_fixture(tmp_path)
+    (vault / "_attachments" / "card.png").write_bytes(b"card-bytes")
+    (vault / "Blogs/Demo" / "with-card.md").write_text(
+        "---\ntitle: With Card\nslug: with-card\ndate: 2026-04-19\n"
+        "og_image: card.png\n---\nBody.\n",
+        encoding="utf-8",
+    )
+    result = cress(vault, target).build()
+    assert "missing_og_image" not in [w.type for w in result.warnings]
+    out = target / "out"
+    hashed = list((out / "assets" / "with-card").glob("*-card.png"))
+    assert len(hashed) == 1
+    assert hashed[0].read_bytes() == b"card-bytes"
+    html = (out / "with-card" / "index.html").read_text(encoding="utf-8")
+    assert f'content="https://x.test/assets/with-card/{hashed[0].name}"' in html
+
+
+def test_missing_og_image_warns(tmp_path: Path) -> None:
+    vault, target = _set_up_fixture(tmp_path)
+    (vault / "Blogs/Demo" / "no-card.md").write_text(
+        "---\ntitle: No Card\nslug: no-card\ndate: 2026-04-19\nog_image: nope.png\n---\nBody.\n",
+        encoding="utf-8",
+    )
+    result = cress(vault, target).build()
+    assert "missing_og_image" in [w.type for w in result.warnings]
+
+
 def test_hero_image_missing_warns_and_clears(tmp_path: Path) -> None:
     vault, target = _set_up_fixture(tmp_path)
     (vault / "Blogs/Demo" / "no-hero.md").write_text(

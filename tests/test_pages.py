@@ -417,6 +417,34 @@ def test_post_external_hero_og_image_passes_through(ctx: PageContext) -> None:
     assert 'property="og:image" content="https://cdn.example.com/x.png"' in content
 
 
+def test_post_og_image_overrides_hero_for_og_tag(ctx: PageContext) -> None:
+    """``og_image`` is the share card; the hero stays the page image."""
+    post = _replace(
+        _post("hello"),
+        image="/blog/assets/hero/abc123.png",
+        og_image="/blog/assets/hero/card456.png",
+        image_alt="Hero shot",
+    )
+    out = render_post_page(post, "<p>body</p>", ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert (
+        'property="og:image" content="https://example.com/blog/assets/hero/card456.png"' in content
+    )
+    assert "abc123.png" not in content
+    assert 'property="og:image:alt" content="Hero shot"' in content
+
+
+def test_post_og_image_without_hero(ctx: PageContext) -> None:
+    post = _replace(_post("hello"), og_image="/blog/assets/hero/card456.png")
+    out = render_post_page(post, "<p>body</p>", ctx)
+    content = out.content
+    assert isinstance(content, str)
+    assert (
+        'property="og:image" content="https://example.com/blog/assets/hero/card456.png"' in content
+    )
+
+
 def test_default_image_og_is_absolute(site_config: SiteConfig) -> None:
     """The ``site.default_image`` fallback (site-relative) is absolutized for og:image."""
     engine = build_engine(site_config, PluginRegistry())

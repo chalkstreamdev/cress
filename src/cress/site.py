@@ -194,6 +194,7 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         # with the raw frontmatter filename.
         attachment_outputs: list[OutputFile] = []
         filtered = [self._resolve_hero_image(p, attachment_outputs, warnings) for p in filtered]
+        filtered = [self._resolve_og_image(p, attachment_outputs, warnings) for p in filtered]
 
         # Step 10: taxonomies (use the hero-resolved posts).
         tag_tax = Taxonomy()
@@ -324,25 +325,59 @@ class cress:  # noqa: N801 — spec fixes the class name as lowercase
         ``post.image`` is cleared so templates can ``{% if page.image_url %}``
         past it cleanly.
         """
-        if post.image is None:
-            return post
-        if post.image.startswith(("http://", "https://", "//", "/", "data:")):
-            return post
-        assert post.slug is not None, "hero image resolution runs after slug write-back"
-        resolved = resolve_attachment(post.image, post, self.config, self.vault)
+        url = self._resolve_post_image(
+            post, post.image, "hero image", "missing_hero_image", attachment_outputs, warnings
+        )
+        return post if url == post.image else _replace(post, image=url)
+
+    def _resolve_og_image(
+        self,
+        post: Post,
+        attachment_outputs: list[OutputFile],
+        warnings: list[BuildWarning],
+    ) -> Post:
+        """Route a post's frontmatter ``og_image:`` through the attachment
+        pipeline, exactly like :meth:`_resolve_hero_image` does for ``image:``.
+        """
+        url = self._resolve_post_image(
+            post, post.og_image, "og image", "missing_og_image", attachment_outputs, warnings
+        )
+        return post if url == post.og_image else _replace(post, og_image=url)
+
+    def _resolve_post_image(
+        self,
+        post: Post,
+        ref: str | None,
+        label: str,
+        warning_type: str,
+        attachment_outputs: list[OutputFile],
+        warnings: list[BuildWarning],
+    ) -> str | None:
+        """Resolve one frontmatter image reference to its public URL.
+
+        Returns ``ref`` unchanged when it is absent or absolute, the hashed
+        public URL when it resolves, and ``None`` (after warning) when the
+        file is missing.
+        """
+        if ref is None:
+            return None
+        if ref.startswith(("http://", "https://", "//", "/", "data:")):
+            return ref
+        assert post.slug is not None, "image resolution runs after slug write-back"
+        resolved = resolve_attachment(ref, post, self.config, self.vault)
         if resolved is None:
             warnings.append(
                 BuildWarning(
-                    type="missing_hero_image",
+                    type=warning_type,
                     file=str(post.source_path),
-                    message=f"hero image {post.image!r} not found",
+                    message=f"{label} {ref!r} not found",
                 )
             )
-            return _replace(post, image=None)
+            return None
         plan = plan_attachment(resolved, post.slug, self.config)
         if plan.output_file not in attachment_outputs:
             attachment_outputs.append(plan.output_file)
-        return _replace(post, image=plan.public_url)
+        return plan.public_url
 
     def _resolve_default_image(
         self,

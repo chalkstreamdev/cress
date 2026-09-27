@@ -85,6 +85,7 @@ def _page_view(post: Post, config: SiteConfig, body_html: str = "") -> dict[str,
         "reading_time_minutes": post.reading_time_minutes,
         "image_url": post.image,
         "image_alt": post.image_alt,
+        "og_image_url": post.og_image,
         "url": post_url(post, config),
         "draft": post.draft,
     }
@@ -144,9 +145,11 @@ def _post_context(post: Post, body_html: str, ctx: PageContext, path: str) -> di
     context = _base_context(ctx, canonical_path=path)
     context["page"] = view
     context["breadcrumbs"] = breadcrumbs_for(post.url_path, ctx.nav)
-    # A post's own hero image wins over the site-wide default for og:image.
-    if view["image_url"] is not None:
-        context["og_image_url"] = _absolute_image_url(view["image_url"], ctx.config)
+    # og:image precedence: the post's share card, then its hero, then the
+    # site-wide default.
+    share_image = view["og_image_url"] or view["image_url"]
+    if share_image is not None:
+        context["og_image_url"] = _absolute_image_url(share_image, ctx.config)
         context["og_image_alt"] = view["image_alt"]
     return context
 

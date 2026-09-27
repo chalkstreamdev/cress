@@ -47,6 +47,7 @@ author: "Nick"
 summary: "One-liner for index and meta description"
 image: images/hero.png
 image_alt: "Chart picking UI"
+og_image: images/share-card.png
 categories: [engineering, product]
 tags: [charts, defaults, ux]
 draft: false
@@ -67,6 +68,7 @@ Some prose.
     assert post.summary == "One-liner for index and meta description"
     assert post.image == "images/hero.png"
     assert post.image_alt == "Chart picking UI"
+    assert post.og_image == "images/share-card.png"
     assert post.categories == ["engineering", "product"]
     assert post.tags == ["charts", "defaults", "ux"]
     assert post.draft is False
@@ -181,6 +183,7 @@ Hello world.
     assert post.canonical is None
     assert post.image is None
     assert post.image_alt is None
+    assert post.og_image is None
 
 
 # --- nav frontmatter fields ---------------------------------------------

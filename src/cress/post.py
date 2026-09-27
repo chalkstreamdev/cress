@@ -67,6 +67,9 @@ class Post:
     summary: str = ""
     image: str | None = None
     image_alt: str | None = None
+    # Social-share card. When set it wins over ``image`` for ``og:image``
+    # only; the hero image on the page stays ``image``.
+    og_image: str | None = None
     categories: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     draft: bool = False
@@ -292,6 +295,8 @@ def parse_post(path: Path, config: SiteConfig) -> Post:
     image = _as_str(image_raw, "image", path) if image_raw is not None else None
     image_alt_raw = metadata.get("image_alt")
     image_alt = _as_str(image_alt_raw, "image_alt", path) if image_alt_raw is not None else None
+    og_image_raw = metadata.get("og_image")
+    og_image = _as_str(og_image_raw, "og_image", path) if og_image_raw is not None else None
 
     categories = _as_str_list(metadata.get("categories", []), "categories", path)
     frontmatter_tags = _as_str_list(metadata.get("tags", []), "tags", path)
@@ -321,6 +326,7 @@ def parse_post(path: Path, config: SiteConfig) -> Post:
         summary=summary,
         image=image,
         image_alt=image_alt,
+        og_image=og_image,
         categories=categories,
         tags=tags,
         draft=draft,
