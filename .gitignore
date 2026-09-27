@@ -65,3 +65,8 @@ htmlcov/
 *--full-page*
 nul
 # ---------------------------- end common block ------------------------
+
+# Repo-local: Claude Code guidance stays on disk but out of the public repo
+# (untracked 2026-09-27 with `git rm --cached`).
+/CLAUDE.md
+/.claude/commands/
