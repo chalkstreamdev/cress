@@ -9,7 +9,7 @@
 - **Depends on:** [`../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md`](../../../backgammondb/docs/specs/2026-08-17-latest-posts-widget.md) — settled the mechanism (its D1–D2): a cress subcommand consumed by a host-app build step
 - **Blocks:** Nothing
 - **Related:**
-  - [`../../../backgammondb/docs/blog.md`](../../../backgammondb/docs/blog.md)
+  - [`../../../backgammondb/docs/marketing/blog.md`](../../../backgammondb/docs/marketing/blog.md)
   - `src/cress/cli.py` (envelope convention)
   - `src/cress/post.py` (`plan_slug_writebacks`)
   - `src/cress/attachments.py` (`plan_attachment`)

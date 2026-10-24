@@ -1,7 +1,7 @@
 # Implementation Plan: `og:site_name` and an ungated `twitter:card`
 
 - **Date:** 2026-08-19
-- **Status:** Executed — awaiting review
+- **Status:** Complete — shipped in cress v0.4.0; all three consumer sites deployed 2026-09-27
 - **Scope:** Two defects in the shipped `<head>` meta partial — `twitter:card` gated behind an unrelated config field, and `og:site_name` never emitted at all. Covers `defaults/_meta.html`, one new optional `site:` field, their tests, and the follow-through in every cress consumer: retiring the workaround in BackgammonDB and setting the site name in DataHero. Deliberately does **not** touch `og:image` sizing, JSON-LD, or template resolution order.
 - **Depends on:** Nothing
 - **Blocks:**
@@ -22,6 +22,7 @@
 |------|---------|---------|
 | 2026-08-19 | Plan created | One optional config field, two template lines, a no-handle test fixture, and a cross-repo cleanup |
 | 2026-09-27 | 5 fixes | Added the DataHero consumer, replaced stale counts and commands with a check over every built page, stated the zero-window risk of the editable install, fixed header links and the CHANGELOG step |
+| 2026-09-27 | Plan complete | Executed as written; the release cut and the social-cache re-scrape were extra steps outside the plan |
 
 Two independent defects, both surfaced while auditing how BackgammonDB's blog and manual unfurl
 on social platforms.
@@ -277,3 +278,12 @@ No output means every page passes. Note that `dist/blog` also contains draft pre
 - **[moderate] Verification too narrow** — One grep on one page for one tag. Replaced with a shell loop that checks every built `index.html` in all three sites for exactly one of each tag, silent on success.
 - **[minor] Header links incomplete** — "Blocks: Nothing in this repo" hid the cross-repo work, and Related omitted DataHero. Blocks now names both consumer edits; Related links the DataHero base template and config and the BackgammonDB deploy script.
 - **[minor] CHANGELOG step assumed an empty Unreleased** — The `### Added` section already exists for the `og_image` work. The step now says to append to it and add a new `### Fixed` section.
+
+### 2026-09-27 — Plan complete
+
+- Tasks 1–4 executed as written. Both config tests failed on the missing attribute before the field was added; the four template tests were added after the template edit, per the TDD exemption for default templates.
+- Task 1 also added `name: "Acme"` to the full-config round-trip fixture in `tests/test_config.py`, beyond the two named tests.
+- Task 2 added a small `_render_post` helper in `tests/test_default_templates.py` so the four meta tests share one context.
+- Task 3 verification ran the per-page check over the locally rebuilt sites (27 + 29 + 20 pages) and again over the shipped `dist/` after each deploy (56 BackgammonDB pages, 20 DataHero pages). Live pages on both domains were fetched and confirmed after deploy.
+- Outside the plan, same session: cress v0.4.0 was cut (version bump, CHANGELOG section, lock refresh), `CLAUDE.md` and `.claude/` were untracked from the public repo, and `.gitattributes` gained the `* text=auto eol=lf` rule. Facebook and LinkedIn re-scraped one BackgammonDB post and both render the large card.
+- Follow-up noted, not done: the DataHero blog index has no `og:image` because its config sets no `site.default_image`, so the ungated large card has no image on index, tag, and category pages there.
