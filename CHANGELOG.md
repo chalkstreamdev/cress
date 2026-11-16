@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-16
+
+### Added
+
+- `index.extra` config list: frontmatter field names that `cress index` adds to every record, under a new `extra` map. Every listed name is a key, with `null` when the post does not set the field. Dates become ISO 8601 strings, and lists and maps pass through at any depth. A value that JSON cannot carry becomes `null` with an `unsupported_extra_value` warning in `cress index`, and `cress validate` fails on it. Only `index` and `validate` use the list; templates do not see the fields. The envelope stays at `version: 1`, so a consumer detects the feature from the `extra` key.
+
+### Fixed
+
+- `cress validate` now reports broken wikilinks as `broken_wikilink` issues and fails on them. Before, the check never ran: it discarded its warnings, and it matched the whole post body as one link target instead of the rendered links. It now renders each body as `cress build` does, so a `[[link]]` inside code is not checked, and a link to a post that has no `slug:` yet resolves to its promised slug. A vault with a broken wikilink that passed `validate` before now fails it.
+
 ## [0.4.0] - 2026-09-27
 
 ### Added
@@ -82,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `template_global`, `hook`, `page`).
 - Manifest-tracked output writer so only cress-owned files are cleaned up.
 
-[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/chalkstreamdev/cress/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/chalkstreamdev/cress/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/chalkstreamdev/cress/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/chalkstreamdev/cress/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/chalkstreamdev/cress/compare/v0.1.0...v0.2.0

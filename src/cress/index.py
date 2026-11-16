@@ -7,9 +7,13 @@ functions ``build`` uses (:func:`cress.post.plan_slug_writebacks`,
 :class:`IndexEntry` records. Writes nothing: slug write-backs are promised,
 never applied, and attachment plans are discarded after their URL is read.
 Consumed by the ``cress index`` CLI command in :mod:`cress.cli`.
+
+:func:`extra_fields` converts the frontmatter fields that ``index.extra``
+lists to JSON values; ``cress validate`` in :mod:`cress.cli` calls it too.
 """
 
 import datetime as _dt
+import math
 from dataclasses import dataclass
 from dataclasses import replace as _replace
 from pathlib import Path
@@ -22,10 +26,17 @@ from cress.pages import post_path, post_url
 from cress.post import Post, compute_url_path, parse_post, plan_slug_writebacks, vault_rel_dir
 from cress.reports import BuildWarning
 
+# The values that ``json.dumps`` writes as valid JSON — no NaN, no Infinity.
+type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+
 
 @dataclass(frozen=True, slots=True)
 class IndexEntry:
-    """One post's record in the index — the spec's full field set."""
+    """One post's record in the index — the spec's full field set.
+
+    ``extra`` holds the frontmatter fields that ``index.extra`` lists, already
+    converted to JSON values: one key per listed name, ``None`` when unset.
+    """
 
     title: str
     slug: str
@@ -41,6 +52,7 @@ class IndexEntry:
     draft: bool
     image: str | None
     image_alt: str | None
+    extra: dict[str, JsonValue]
 
     def to_json_dict(self) -> dict[str, Any]:
         """Serialise for the ``--json`` envelope: dates become ISO 8601 strings."""
@@ -59,6 +71,7 @@ class IndexEntry:
             "draft": self.draft,
             "image": self.image,
             "image_alt": self.image_alt,
+            "extra": self.extra,
         }
 
 
@@ -80,6 +93,8 @@ def build_post_index(
     (empty entries, ``empty_vault`` warning). Hard errors mirror ``build``:
     a missing vault subfolder or an all-unparseable vault raise
     :class:`ConfigError`; duplicate slugs raise :class:`DuplicateSlugError`.
+    An ``index.extra`` value that JSON cannot carry becomes ``None`` with an
+    ``unsupported_extra_value`` warning, for the emitted posts only.
     """
     reset_attachment_cache()
     warnings: list[BuildWarning] = []
@@ -144,6 +159,10 @@ def build_post_index(
     entries: list[IndexEntry] = []
     for post in posts:
         assert post.slug is not None
+        # After the draft filter, so an excluded draft gives no warning
+        # (extra-fields spec § 3.3), as for ``missing_hero_image``.
+        extra, extra_warnings = extra_fields(post, config.index.extra)
+        warnings.extend(extra_warnings)
         entries.append(
             IndexEntry(
                 title=post.title,
@@ -160,6 +179,7 @@ def build_post_index(
                 draft=post.draft,
                 image=_resolve_image(post, config, vault, warnings),
                 image_alt=post.image_alt,
+                extra=extra,
             )
         )
     return IndexResult(entries=entries, warnings=warnings)
@@ -205,3 +225,95 @@ def _resolve_image(
         )
         return None
     return plan_attachment(resolved, post.slug, config).public_url
+
+
+def extra_fields(
+    post: Post, names: tuple[str, ...]
+) -> tuple[dict[str, JsonValue], list[BuildWarning]]:
+    """Convert the frontmatter fields that ``index.extra`` lists to JSON values.
+
+    Args:
+        post: The parsed post. Only ``frontmatter_raw`` and ``source_path`` are read.
+        names: The field names from ``index.extra``, in order.
+
+    Returns:
+        A map with one key per name, and the warnings. A field the post does
+        not set is ``None``. A field whose value JSON cannot carry is ``None``
+        too, with one ``unsupported_extra_value`` warning that names the path
+        to the bad part.
+
+    Pure: no I/O. ``build_post_index`` and ``cress validate`` both call it, so
+    the two commands give the same warning.
+    """
+    values: dict[str, JsonValue] = {}
+    warnings: list[BuildWarning] = []
+    for name in names:
+        location = f"extra.{name}"
+        try:
+            values[name] = _to_json(post.frontmatter_raw.get(name), location, frozenset())
+            continue
+        except _UnsupportedValue as exc:
+            error = exc
+        except RecursionError:
+            # PyYAML builds nested values without recursion, so a value can
+            # load that this recursive walk cannot convert (spec § 2).
+            error = _UnsupportedValue(location, "the value is nested too deeply")
+        values[name] = None
+        warnings.append(
+            BuildWarning(
+                type="unsupported_extra_value", file=str(post.source_path), message=str(error)
+            )
+        )
+    return values, warnings
+
+
+class _UnsupportedValue(Exception):
+    """A part of an extra field that JSON cannot carry.
+
+    :func:`_to_json` raises it; :func:`extra_fields` catches it once per field.
+    """
+
+    def __init__(self, location: str, reason: str) -> None:
+        super().__init__(f"`{location}`: {reason}")
+
+
+def _to_json(value: object, location: str, on_path: frozenset[int]) -> JsonValue:
+    """Convert one frontmatter value to a JSON value, recursing into lists and maps.
+
+    ``location`` is the path to ``value`` for the warning message
+    (``extra.links[1].href``). ``on_path`` holds the ids of the lists and maps
+    between the field and ``value``: meeting one of them again means the
+    value contains itself (a self-referring YAML anchor). A list or a map
+    that appears twice but does not contain itself is still supported.
+
+    Raises:
+        _UnsupportedValue: for the first part that JSON cannot carry.
+    """
+    match value:
+        case None | bool() | int() | str():
+            return value
+        case float():
+            if math.isfinite(value):
+                return value
+            token = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+            raise _UnsupportedValue(location, f"{token} cannot be written as JSON")
+        case _dt.date():
+            # Also matches ``datetime``, a subclass of ``date``.
+            return value.isoformat()
+        case list() | dict() if id(value) in on_path:
+            raise _UnsupportedValue(location, "the value contains itself")
+        case list():
+            inner = on_path | {id(value)}
+            return [_to_json(item, f"{location}[{i}]", inner) for i, item in enumerate(value)]
+        case dict():
+            inner = on_path | {id(value)}
+            converted: dict[str, JsonValue] = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise _UnsupportedValue(
+                        location, f"map key {key} ({type(key).__name__}) is not a string"
+                    )
+                converted[key] = _to_json(item, f"{location}.{key}", inner)
+            return converted
+        case _:
+            raise _UnsupportedValue(location, f"{type(value).__name__} cannot be written as JSON")

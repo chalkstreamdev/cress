@@ -6,6 +6,7 @@ constructs a ``cress`` instance, and delegates.
 
 import json
 from dataclasses import asdict
+from dataclasses import replace as _replace
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -14,7 +15,7 @@ import typer
 from cress.build_result import BuildResult
 from cress.config import load_user_config, resolve_vault
 from cress.exceptions import CressError
-from cress.index import build_post_index
+from cress.index import build_post_index, extra_fields
 from cress.post import (
     Post,
     apply_slug_writebacks,
@@ -22,6 +23,7 @@ from cress.post import (
     plan_slug_writebacks,
     vault_rel_dir,
 )
+from cress.render import RenderContext, render_markdown_text
 from cress.reports import BuildWarning
 from cress.site import cress
 from cress.wikilinks import build_slug_map, substitute_wikilinks
@@ -293,7 +295,10 @@ def index(
 
 
 def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
-    """Parse every post, plan slugs, resolve wikilinks — collect issues without writing output."""
+    """Parse every post, check the ``index.extra`` values, plan slugs, resolve wikilinks.
+
+    Collects issues without writing output.
+    """
     issues: list[BuildWarning] = []
     vault_posts = site.vault / site.config.vault_subfolder
     md_paths = sorted(vault_posts.rglob("*.md"))
@@ -314,6 +319,12 @@ def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
 
     if not posts:
         return issues
+
+    # Before the slug checks: the duplicate-slug branch below returns early,
+    # and this check must still run (extra-fields spec § 3.4). Drafts too.
+    for post in posts:
+        _, extra_issues = extra_fields(post, site.config.index.extra)
+        issues.extend(extra_issues)
 
     # In static-pages mode a missing date is allowed; surface it as a soft hint.
     if site.config.static_pages:
@@ -361,17 +372,20 @@ def _run_validate(site: cress, *, fix: bool) -> list[BuildWarning]:
                     )
                 )
 
-    # Check wikilinks by running substitution against a render-agnostic body.
-    slug_map = build_slug_map(posts, namespace=_namespace)
-    wl_warnings: list[BuildWarning] = []
-    for post in posts:
+    # Resolve wikilinks as ``build`` does: render each body to placeholders,
+    # then substitute, so a ``[[link]]`` inside code is not checked. Without
+    # ``--fix`` a post can still lack a slug; it takes the slug the plan
+    # promises, so a link to it resolves. The rendered HTML is discarded.
+    promised = dict(plan.writebacks)
+    linkable = [
+        p if p.slug is not None else _replace(p, slug=promised[p.source_path]) for p in posts
+    ]
+    slug_map = build_slug_map(linkable, namespace=_namespace)
+    render_ctx = RenderContext()  # Shortcode names change code blocks only, never links.
+    for post in linkable:
         substitute_wikilinks(
-            f'<a data-cress-wikilink="{post.body_md}" data-cress-alias=""></a>',
-            slug_map,
-            [],
-            post.source_path,
+            render_markdown_text(post.body_md, render_ctx), slug_map, issues, post.source_path
         )
-    issues.extend(wl_warnings)
     return issues
 
 

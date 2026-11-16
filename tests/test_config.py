@@ -57,6 +57,9 @@ git:
   auto_push: true
   remote: "deploy"
   commit_prefix: "site:"
+index:
+  extra:
+    - announce
 """
 
 
@@ -126,6 +129,7 @@ def test_full_config_round_trips_every_field(tmp_path: Path) -> None:
     assert config.git == GitConfig(
         auto_commit=True, auto_push=True, remote="deploy", commit_prefix="site:"
     )
+    assert config.index.extra == ("announce",)
 
 
 def test_site_name_parsed_when_present(tmp_path: Path) -> None:
@@ -411,3 +415,51 @@ def test_extra_stylesheets_item_wrong_type_raises(tmp_path: Path) -> None:
     with pytest.raises(ConfigError) as exc:
         load_site_config(tmp_path)
     assert "extra_stylesheets" in str(exc.value)
+
+
+# --- index: block (extra-fields spec § 3.1) ---------------------------------
+
+
+def test_index_extra_defaults_to_empty_tuple(tmp_path: Path) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG)
+    config = load_site_config(tmp_path)
+    assert config.index.extra == ()
+
+
+def test_index_extra_list_preserved_in_order(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + "index:\n  extra:\n    - announce\n    - featured\n"
+    _write_config(tmp_path, body)
+    config = load_site_config(tmp_path)
+    assert config.index.extra == ("announce", "featured")
+
+
+def test_index_unknown_key_ignored(tmp_path: Path) -> None:
+    body = MINIMAL_CONFIG + "index:\n  sitemap: true\n"
+    _write_config(tmp_path, body)
+    config = load_site_config(tmp_path)
+    assert config.index.extra == ()
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ("index: [announce]\n", "index: must be a mapping"),
+        ("index:\n", "index: must be a mapping"),
+        ("index:\n  extra: announce\n", "index.extra: must be a list"),
+        ("index:\n  extra:\n", "index.extra: must be a list"),
+        (
+            "index:\n  extra:\n    - announce\n    - 42\n",
+            "index.extra[1]: must be a non-empty string",
+        ),
+        ('index:\n  extra:\n    - ""\n', "index.extra[0]: must be a non-empty string"),
+        (
+            "index:\n  extra:\n    - announce\n    - announce\n",
+            "index.extra[1]: duplicate name 'announce'",
+        ),
+    ],
+)
+def test_index_config_invalid_raises(tmp_path: Path, body: str, message: str) -> None:
+    _write_config(tmp_path, MINIMAL_CONFIG + body)
+    with pytest.raises(ConfigError) as exc:
+        load_site_config(tmp_path)
+    assert message in str(exc.value)

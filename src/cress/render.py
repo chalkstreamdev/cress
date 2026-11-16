@@ -51,11 +51,24 @@ _CALLOUT_MARKER_RE = re.compile(r"^ *\[!(?P<kind>[A-Za-z][\w-]*)\][-+]? *(?P<tit
 
 # Author-facing type aliases → the four canonical styles.
 _CALLOUT_ALIASES = {
-    "info": "info", "information": "info", "note": "info", "todo": "info",
-    "success": "success", "tip": "success", "check": "success", "done": "success",
-    "hint": "success", "warning": "warning", "caution": "warning", "attention": "warning",
-    "important": "warning", "error": "error", "danger": "error", "fail": "error",
-    "failure": "error", "bug": "error",
+    "info": "info",
+    "information": "info",
+    "note": "info",
+    "todo": "info",
+    "success": "success",
+    "tip": "success",
+    "check": "success",
+    "done": "success",
+    "hint": "success",
+    "warning": "warning",
+    "caution": "warning",
+    "attention": "warning",
+    "important": "warning",
+    "error": "error",
+    "danger": "error",
+    "fail": "error",
+    "failure": "error",
+    "bug": "error",
 }
 
 # Default title when the author gives none (just ``> [!warning]``).
@@ -63,7 +76,7 @@ _CALLOUT_LABELS = {
     "info": "Information",
     "success": "Success",
     "warning": "Warning",
-    "error": "Error"
+    "error": "Error",
 }
 
 # Lucide-style icon paths (drawn with stroke=currentColor so they pick up the
@@ -71,9 +84,10 @@ _CALLOUT_LABELS = {
 _CALLOUT_ICONS = {
     "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
     "success": '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
-    "warning":
+    "warning": (
         '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>'
-        '<path d="M12 9v4"/><path d="M12 17h.01"/>',
+        '<path d="M12 9v4"/><path d="M12 17h.01"/>'
+    ),
     "error": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
 }
 
@@ -174,7 +188,7 @@ def _parse_block_quote_or_callout(block: BlockParser, m: Match[str], state: Bloc
     if marker:
         kind = _CALLOUT_ALIASES.get(marker.group("kind").lower(), "info")
         title = (marker.group("title") or "").strip()
-        child = state.child_state(text[marker.end():])
+        child = state.child_state(text[marker.end() :])
         block.parse(child, rules)
         token: dict[str, Any] = {
             "type": "callout",
@@ -194,10 +208,8 @@ def _parse_block_quote_or_callout(block: BlockParser, m: Match[str], state: Bloc
 
 
 def _render_callout(
-        renderer: HTMLRenderer,
-        text: str,
-        callout_kind: str,
-        callout_title: str) -> str:
+    renderer: HTMLRenderer, text: str, callout_kind: str, callout_title: str
+) -> str:
     del renderer
     label = callout_title or _CALLOUT_LABELS[callout_kind]
     svg = (

@@ -58,6 +58,15 @@ class GitConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class IndexConfig:
+    """The ``index:`` block — settings for ``cress index`` and ``cress validate``."""
+
+    # Frontmatter field names that ``cress index`` adds to every record, under
+    # ``extra``. ``cress validate`` checks that each value can be written as JSON.
+    extra: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class SiteConfig:
     """Resolved site configuration.
 
@@ -103,6 +112,9 @@ class SiteConfig:
     vite_manifest: Path | None = None
     vite_asset_prefix: str = "/"
     extra_stylesheets: tuple[str, ...] = ()
+    # The ``index:`` block. Only ``cress index`` and ``cress validate`` use it;
+    # ``build``, ``serve``, and ``publish`` load it and ignore it.
+    index: IndexConfig = field(default_factory=IndexConfig)
 
 
 def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfig:
@@ -180,6 +192,11 @@ def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfi
         commit_prefix=_as_str(git_raw.get("commit_prefix", "blog:"), "git.commit_prefix"),
     )
 
+    index_raw = raw.get("index", {})
+    if not isinstance(index_raw, dict):
+        raise ConfigError("index: must be a mapping")
+    index_cfg = IndexConfig(extra=_as_field_names(index_raw.get("extra", []), "index.extra"))
+
     templates_raw = raw.get("templates", {})
     if not isinstance(templates_raw, dict):
         raise ConfigError("templates: must be a mapping")
@@ -224,6 +241,7 @@ def load_site_config(target: Path, config_path: Path | None = None) -> SiteConfi
         vite_manifest=vite_manifest,
         vite_asset_prefix=_as_str(raw.get("vite_asset_prefix", "/"), "vite_asset_prefix"),
         extra_stylesheets=extra_stylesheets,
+        index=index_cfg,
     )
 
 
@@ -334,6 +352,20 @@ def _as_bool(value: Any, key: str) -> bool:
     if not isinstance(value, bool):
         raise ConfigError(f"{key}: expected boolean, got {type(value).__name__}")
     return value
+
+
+def _as_field_names(value: Any, key: str) -> tuple[str, ...]:
+    """A list of unique, non-empty strings, kept in order. Names are not stripped or case-folded."""
+    if not isinstance(value, list):
+        raise ConfigError(f"{key}: must be a list")
+    names: list[str] = []
+    for idx, item in enumerate(value):
+        if not isinstance(item, str) or item == "":
+            raise ConfigError(f"{key}[{idx}]: must be a non-empty string")
+        if item in names:
+            raise ConfigError(f"{key}[{idx}]: duplicate name {item!r}")
+        names.append(item)
+    return tuple(names)
 
 
 def _maybe[T](value: Any, key: str, cast: Callable[[Any, str], T]) -> T | None:

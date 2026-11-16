@@ -2,6 +2,9 @@
 
 import datetime as _dt
 import hashlib
+import math
+import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -10,8 +13,9 @@ from cress import plugin
 from cress.attachments import plan_attachment
 from cress.config import SiteConfig, load_site_config
 from cress.exceptions import ConfigError, DuplicateSlugError
-from cress.index import build_post_index
-from cress.post import parse_post
+from cress.index import build_post_index, extra_fields
+from cress.post import Post, parse_post
+from cress.reports import BuildWarning
 from cress.site import cress
 
 _MIN_CONFIG = """\
@@ -34,6 +38,7 @@ def _set_up_site(
     *,
     base_url: str = "https://x.test",
     static_pages: bool = False,
+    extra: tuple[str, ...] = (),
 ) -> tuple[Path, SiteConfig]:
     vault = tmp_path / "vault"
     (vault / "Blogs/Demo").mkdir(parents=True)
@@ -44,6 +49,8 @@ def _set_up_site(
     config_text = _MIN_CONFIG.format(base_url=base_url)
     if static_pages:
         config_text += "static_pages: true\n"
+    if extra:
+        config_text += "index:\n  extra:\n" + "".join(f"    - {name}\n" for name in extra)
     (target / ".cress" / "config.yaml").write_text(config_text, encoding="utf-8")
     (target / "out").mkdir()
     return vault, load_site_config(target)
@@ -286,3 +293,262 @@ def test_duplicate_slugs_raise(tmp_path: Path) -> None:
     _write_post(vault, "b.md", "---\ntitle: Same Title\ndate: 2026-08-15\n---\nBody.\n")
     with pytest.raises(DuplicateSlugError):
         build_post_index(vault, config)
+
+
+# --- extra field conversion (extra-fields spec § 3.3) ---------------------
+
+
+def _post_with(frontmatter: dict[str, object]) -> Post:
+    return Post(
+        source_path=Path("vault/a.md"),
+        title="A",
+        date=_dt.date(2026, 11, 9),
+        body_md="",
+        frontmatter_raw=frontmatter,
+    )
+
+
+def _unsupported(message: str) -> BuildWarning:
+    return BuildWarning(
+        type="unsupported_extra_value", file=str(Path("vault/a.md")), message=message
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("text", "text"),
+        (3, 3),
+        (True, True),
+        (None, None),
+        (1.5, 1.5),
+        (_dt.date(2026, 11, 9), "2026-11-09"),
+        (_dt.datetime(2026, 11, 9, 10, 0), "2026-11-09T10:00:00"),
+        (
+            _dt.datetime(2026, 11, 9, 10, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=2))),
+            "2026-11-09T10:00:00+02:00",
+        ),
+        ([1, _dt.date(2026, 11, 9)], [1, "2026-11-09"]),
+        ({"a": {"b": [_dt.date(2026, 11, 9)]}}, {"a": {"b": ["2026-11-09"]}}),
+        ([], []),
+        ({}, {}),
+    ],
+    ids=[
+        "str",
+        "int",
+        "bool",
+        "null",
+        "float",
+        "date",
+        "naive-datetime",
+        "aware-datetime",
+        "list",
+        "nested-map",
+        "empty-list",
+        "empty-map",
+    ],
+)
+def test_extra_fields_converts_supported_value(value: object, expected: object) -> None:
+    assert extra_fields(_post_with({"v": value}), ("v",)) == ({"v": expected}, [])
+
+
+def test_extra_fields_unset_name_is_null() -> None:
+    assert extra_fields(_post_with({}), ("missing",)) == ({"missing": None}, [])
+
+
+def test_extra_fields_no_names_gives_empty_map() -> None:
+    assert extra_fields(_post_with({"v": 1}), ()) == ({}, [])
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (math.nan, "`extra.v`: NaN cannot be written as JSON"),
+        (math.inf, "`extra.v`: Infinity cannot be written as JSON"),
+        (-math.inf, "`extra.v`: -Infinity cannot be written as JSON"),
+        (b"hello", "`extra.v`: bytes cannot be written as JSON"),
+        ({"a", "b"}, "`extra.v`: set cannot be written as JSON"),
+        (("a", 1), "`extra.v`: tuple cannot be written as JSON"),
+        ({1: "one"}, "`extra.v`: map key 1 (int) is not a string"),
+        ({_dt.date(2026, 11, 9): "x"}, "`extra.v`: map key 2026-11-09 (date) is not a string"),
+        ([1, math.nan], "`extra.v[1]`: NaN cannot be written as JSON"),
+        ({"links": [{"href": math.nan}]}, "`extra.v.links[0].href`: NaN cannot be written as JSON"),
+    ],
+    ids=[
+        "nan",
+        "inf",
+        "minus-inf",
+        "bytes",
+        "set",
+        "tuple",
+        "int-key",
+        "date-key",
+        "nan-in-list",
+        "nan-deep",
+    ],
+)
+def test_extra_fields_unsupported_value_nulls_field_and_warns(value: object, message: str) -> None:
+    assert extra_fields(_post_with({"v": value}), ("v",)) == (
+        {"v": None},
+        [_unsupported(message)],
+    )
+
+
+def _list_that_contains_itself() -> object:
+    loop: list[object] = [1]
+    loop.append(loop)
+    return loop
+
+
+def _map_that_contains_itself() -> object:
+    loop: dict[str, object] = {}
+    loop["self"] = loop
+    return loop
+
+
+@pytest.mark.parametrize(
+    ("make", "message"),
+    [
+        (_list_that_contains_itself, "`extra.v[1]`: the value contains itself"),
+        (_map_that_contains_itself, "`extra.v.self`: the value contains itself"),
+    ],
+    ids=["list", "map"],
+)
+def test_extra_fields_value_that_contains_itself_is_unsupported(
+    make: Callable[[], object], message: str
+) -> None:
+    assert extra_fields(_post_with({"v": make()}), ("v",)) == (
+        {"v": None},
+        [_unsupported(message)],
+    )
+
+
+def test_extra_fields_value_nested_too_deeply_is_unsupported() -> None:
+    deep: object = 1
+    for _ in range(2 * sys.getrecursionlimit()):
+        deep = [deep]
+    assert extra_fields(_post_with({"v": deep}), ("v",)) == (
+        {"v": None},
+        [_unsupported("`extra.v`: the value is nested too deeply")],
+    )
+
+
+def test_extra_fields_shared_value_is_not_a_cycle() -> None:
+    shared = [1]
+    assert extra_fields(_post_with({"v": [shared, shared]}), ("v",)) == ({"v": [[1], [1]]}, [])
+
+
+def test_extra_fields_bad_field_leaves_other_fields() -> None:
+    values, warnings = extra_fields(_post_with({"good": 1, "bad": math.nan}), ("good", "bad"))
+    assert (values, len(warnings)) == ({"good": 1, "bad": None}, 1)
+
+
+# --- extra fields on records (extra-fields spec § 3.2) --------------------
+
+
+def _post_text(frontmatter: str, *, slug: str = "a", date: str = "2026-08-14") -> str:
+    return f"---\ntitle: {slug.upper()}\nslug: {slug}\ndate: {date}\n{frontmatter}---\nBody.\n"
+
+
+def test_extra_is_empty_map_when_config_lists_nothing(tmp_path: Path) -> None:
+    vault, config = _set_up_site(tmp_path)
+    _write_post(vault, "a.md", _post_text("announce: true\n"))
+    [entry] = build_post_index(vault, config).entries
+    assert (entry.extra, entry.to_json_dict()["extra"]) == ({}, {})
+
+
+def test_extra_carries_listed_value(tmp_path: Path) -> None:
+    vault, config = _set_up_site(tmp_path, extra=("announce",))
+    _write_post(vault, "a.md", _post_text("announce: true\n"))
+    [entry] = build_post_index(vault, config).entries
+    assert entry.extra == {"announce": True}
+
+
+def test_extra_unset_and_explicit_null_give_same_value(tmp_path: Path) -> None:
+    vault, config = _set_up_site(tmp_path, extra=("announce",))
+    _write_post(vault, "a.md", _post_text("announce: null\n", slug="a"))
+    _write_post(vault, "b.md", _post_text("", slug="b"))
+    entries = build_post_index(vault, config).entries
+    assert [e.extra for e in entries] == [{"announce": None}, {"announce": None}]
+
+
+def test_extra_listed_builtin_name_is_the_authored_value(tmp_path: Path) -> None:
+    vault, config = _set_up_site(tmp_path, extra=("summary",))
+    _write_post(vault, "a.md", _post_text(""))
+    [entry] = build_post_index(vault, config).entries
+    assert (entry.extra, entry.summary) == ({"summary": None}, "Body.")
+
+
+@pytest.mark.parametrize(
+    ("frontmatter", "expected"),
+    [
+        ("score: 2026-11-09\n", "2026-11-09"),
+        ("score: 2026-11-09T10:00:00+02:00\n", "2026-11-09T10:00:00+02:00"),
+        ("score: [a, b]\n", ["a", "b"]),
+        ("score: {zeta: 1, alpha: 2}\n", {"zeta": 1, "alpha": 2}),
+        ("x: &x [1]\nscore: [*x, *x]\n", [[1], [1]]),
+    ],
+    ids=["date", "aware-datetime", "list", "map", "shared-anchor"],
+)
+def test_extra_yaml_value_converts(tmp_path: Path, frontmatter: str, expected: object) -> None:
+    vault, config = _set_up_site(tmp_path, extra=("score",))
+    _write_post(vault, "a.md", _post_text(frontmatter))
+    [entry] = build_post_index(vault, config).entries
+    assert entry.extra == {"score": expected}
+
+
+@pytest.mark.parametrize(
+    "frontmatter",
+    [
+        "score: .nan\n",
+        "score: .inf\n",
+        "score: !!binary aGVsbG8=\n",
+        "score: !!set {a, b}\n",
+        "score: !!omap [{a: 1}]\n",
+        "score: {1: one}\n",
+        "score: {2026-11-09: x}\n",
+        "score: &a [1, *a]\n",
+        # Loads through PyYAML, which builds nested values without recursion
+        # (extra-fields spec § 2).
+        "score: " + "[" * 1200 + "1" + "]" * 1200 + "\n",
+    ],
+    ids=["nan", "inf", "binary", "set", "omap", "int-key", "date-key", "self-anchor", "deep"],
+)
+def test_extra_unsupported_yaml_value_warns_and_nulls(tmp_path: Path, frontmatter: str) -> None:
+    vault, config = _set_up_site(tmp_path, extra=("score",))
+    _write_post(vault, "a.md", _post_text(frontmatter))
+    result = build_post_index(vault, config)
+    [entry] = result.entries
+    assert (entry.extra, [w.type for w in result.warnings]) == (
+        {"score": None},
+        ["unsupported_extra_value"],
+    )
+
+
+def _extra_draft_fixture(tmp_path: Path) -> tuple[Path, SiteConfig]:
+    vault, config = _set_up_site(tmp_path, extra=("score",))
+    _write_post(vault, "a.md", _post_text("score: 1\n", slug="a"))
+    _write_post(vault, "secret.md", _post_text("draft: true\nscore: .nan\n", slug="secret"))
+    return vault, config
+
+
+def test_extra_warning_skips_excluded_draft(tmp_path: Path) -> None:
+    vault, config = _extra_draft_fixture(tmp_path)
+    assert build_post_index(vault, config).warnings == []
+
+
+def test_extra_warning_covers_included_draft(tmp_path: Path) -> None:
+    vault, config = _extra_draft_fixture(tmp_path)
+    result = build_post_index(vault, config, include_drafts=True)
+    draft = next(e for e in result.entries if e.slug == "secret")
+    assert (draft.extra, [w.type for w in result.warnings]) == (
+        {"score": None},
+        ["unsupported_extra_value"],
+    )
+
+
+def test_extra_in_static_pages_mode(tmp_path: Path) -> None:
+    vault, config = _set_up_site(tmp_path, static_pages=True, extra=("announce",))
+    _write_post(vault, "about.md", "---\ntitle: About\nslug: about\nannounce: true\n---\nBody.\n")
+    [entry] = build_post_index(vault, config).entries
+    assert (entry.date, entry.extra) == (None, {"announce": True})

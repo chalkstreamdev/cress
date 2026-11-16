@@ -125,7 +125,7 @@ vault: /Users/me/Obsidian/Main
 | Command | What it does |
 | --- | --- |
 | `cress build` | Renders the vault into `<output_dir>`. Continues past per-post errors (they surface as warnings). |
-| `cress validate` | Parses every post without writing. Exits non-zero on any issue. `--fix` writes missing slugs. |
+| `cress validate` | Parses every post without writing. Exits non-zero on any issue, including an `index.extra` value that JSON cannot carry. `--fix` writes missing slugs. |
 | `cress serve` | Builds once, serves `<output_dir>` on localhost, rebuilds on source changes. `--live-reload` reloads the browser; `--list-drafts` adds drafts to the article index, linked to their unlisted preview URLs. |
 | `cress publish` | Builds, stages `<output_dir>` in the target repo, commits with the configured prefix, and optionally pushes. |
 | `cress index` | Emits the post list as structured data without building — for host-app integration. `--drafts` includes drafts; `--json` for the envelope. |
@@ -172,7 +172,8 @@ one record per post:
         "reading_time_minutes": 3,
         "draft": false,
         "image": "/blog/assets/opening-rolls-revisited/3fa9c2d1-hero.png",
-        "image_alt": "Opening position heatmap"
+        "image_alt": "Opening position heatmap",
+        "extra": { "announce": true }
       }
     ]
   },
@@ -189,6 +190,8 @@ URLs are promises that build keeps. `image` is the content-hashed public URL the
 produce (`null` when absent or missing). Drafts are excluded unless `--drafts` is passed;
 included drafts carry their unlisted `_drafts/…` preview path and a ` [draft]` marker in the
 human listing.
+
+`extra` holds the frontmatter fields that the `index.extra` config list names (see [Configuration](#configuration)), on every record. Every listed name is a key, with `null` when the post does not set the field or sets it to `null`. With no `index.extra` list, `extra` is `{}`. Dates and datetimes become ISO 8601 strings. Lists and maps pass through at any depth. The envelope sorts map keys, so only a list keeps its order. A value that JSON cannot carry (`.nan`, `!!binary`, a map key that is not a string, a YAML anchor that refers to itself) becomes `null`, with an `unsupported_extra_value` warning, and `cress validate` fails on it. The envelope stays at `version: 1`, so a consumer detects the feature from the `extra` key. Templates do not see these fields.
 
 ## Configuration
 
@@ -250,6 +253,12 @@ git:
   auto_push: false
   remote: "origin"
   commit_prefix: "blog:"
+
+# Frontmatter fields that `cress index` adds to every record, under `extra`.
+# Only `index` and `validate` use them.
+index:
+  extra:
+    - announce
 ```
 
 ### Hooking up your build tool's CSS
@@ -428,7 +437,7 @@ nav_hidden: false                 # true → omit from the sidebar tree (still b
 ---
 ```
 
-Dates must be ISO 8601. `date` is required in blog mode but optional under [`static_pages`](#static-pages-mode). Missing `slug` values are generated from `title` and written back to the source file at build time. The `nav_*` fields shape the [static-pages sidebar](#navigation-static-pages-mode) and have no effect in blog mode.
+Dates must be ISO 8601. `date` is required in blog mode but optional under [`static_pages`](#static-pages-mode). Missing `slug` values are generated from `title` and written back to the source file at build time. The `nav_*` fields shape the [static-pages sidebar](#navigation-static-pages-mode) and have no effect in blog mode. Other keys do not reach the templates. `cress index` emits the keys that the `index.extra` config list names, under `extra` (see [Machine-readable post index](#machine-readable-post-index)).
 
 ## Authoring features
 

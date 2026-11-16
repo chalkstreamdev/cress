@@ -308,3 +308,208 @@ def test_cli_validate_fix_json(fixture: tuple[Path, Path]) -> None:
     payload = json.loads(result.stdout)
     assert payload["version"] == 1
     assert payload["ok"] is True
+
+
+# --- index.extra (extra-fields spec § 3.2–3.4) ----------------------------
+
+_INDEX_EXTRA = "index:\n  extra:\n    - announce\n    - score\n"
+
+
+def _reject_constant(name: str) -> None:
+    """``json.loads`` hook: fail on ``NaN`` and ``Infinity``, as ``JSON.parse`` does."""
+    raise ValueError(f"non-JSON constant {name}")
+
+
+def _extra_site(target: Path, config_text: str = _CONFIG + _INDEX_EXTRA) -> None:
+    (target / ".cress/config.yaml").write_text(config_text, encoding="utf-8")
+
+
+def _write_extra_post(
+    vault: Path, frontmatter: str, *, name: str = "a", draft: bool = False
+) -> None:
+    header = f"title: {name.upper()}\nslug: {name}\ndate: 2026-08-14\n"
+    draft_line = "draft: true\n" if draft else ""
+    (vault / f"Blogs/Demo/{name}.md").write_text(
+        f"---\n{header}{draft_line}{frontmatter}---\nbody\n", encoding="utf-8"
+    )
+
+
+def _index_json(vault: Path, target: Path) -> tuple[int, str]:
+    result = CliRunner().invoke(
+        app, ["index", "--vault", str(vault), "--target", str(target), "--json"]
+    )
+    return result.exit_code, result.stdout
+
+
+def test_cli_index_json_record_carries_extra(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "announce: true\n")
+    _, stdout = _index_json(vault, target)
+    payload = json.loads(stdout)
+    [record] = payload["result"]["posts"]
+    assert (payload["version"], record["extra"]) == (1, {"announce": True, "score": None})
+
+
+def test_cli_index_json_unsupported_value_is_valid_json(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n")
+    exit_code, stdout = _index_json(vault, target)
+    payload = json.loads(stdout, parse_constant=_reject_constant)
+    [record] = payload["result"]["posts"]
+    assert (exit_code, payload["ok"], record["extra"]["score"]) == (0, True, None)
+    assert [w["type"] for w in payload["warnings"]] == ["unsupported_extra_value"]
+
+
+def test_cli_index_json_self_referring_anchor_emits_envelope(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: &a [1, *a]\n")
+    exit_code, stdout = _index_json(vault, target)
+    payload = json.loads(stdout, parse_constant=_reject_constant)
+    assert (exit_code, payload["ok"], [w["type"] for w in payload["warnings"]]) == (
+        0,
+        True,
+        ["unsupported_extra_value"],
+    )
+
+
+def test_cli_index_human_unsupported_value_warns_on_stderr(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n")
+    result = CliRunner().invoke(app, ["index", "--vault", str(vault), "--target", str(target)])
+    assert result.stdout.splitlines() == ["2026-08-14  /a/  A"]
+    assert "unsupported_extra_value" in result.stderr
+
+
+def test_cli_index_invalid_extra_config_json_ok_false(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target, _CONFIG + "index:\n  extra: announce\n")
+    _write_extra_post(vault, "")
+    exit_code, stdout = _index_json(vault, target)
+    payload = json.loads(stdout)
+    assert (exit_code, payload["ok"], payload["errors"][0]["type"]) == (1, False, "ConfigError")
+
+
+def test_cli_build_ignores_index_block(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n")
+    result = CliRunner().invoke(app, ["build", "--vault", str(vault), "--target", str(target)])
+    assert result.exit_code == 0
+
+
+def _validate(vault: Path, target: Path, *extra_args: str) -> tuple[int, str]:
+    result = CliRunner().invoke(
+        app, ["validate", "--vault", str(vault), "--target", str(target), *extra_args]
+    )
+    return result.exit_code, result.stdout
+
+
+def test_cli_validate_fails_on_unsupported_extra_value(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n")
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, "unsupported_extra_value" in stdout) == (1, True)
+
+
+def test_cli_validate_json_lists_unsupported_extra_value(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n")
+    _, stdout = _validate(vault, target, "--json")
+    payload = json.loads(stdout)
+    assert (payload["ok"], [w["type"] for w in payload["warnings"]]) == (
+        False,
+        ["unsupported_extra_value"],
+    )
+
+
+def test_cli_validate_passes_with_supported_extra_values(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: 3\n")
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, stdout.splitlines()[-1]) == (0, "0 issue(s)")
+
+
+def test_cli_validate_ignores_unlisted_field(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_extra_post(vault, "score: .nan\n")
+    exit_code, _ = _validate(vault, target)
+    assert exit_code == 0
+
+
+def test_cli_validate_reports_unsupported_value_despite_duplicate_slugs(
+    fixture: tuple[Path, Path],
+) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    (vault / "Blogs/Demo/a.md").write_text(
+        "---\ntitle: Same Title\ndate: 2026-08-14\nscore: .nan\n---\nbody\n", encoding="utf-8"
+    )
+    (vault / "Blogs/Demo/b.md").write_text(
+        "---\ntitle: Same Title\ndate: 2026-08-15\n---\nbody\n", encoding="utf-8"
+    )
+    _, stdout = _validate(vault, target)
+    assert ("duplicate_slug" in stdout, "unsupported_extra_value" in stdout) == (True, True)
+
+
+def test_cli_validate_checks_drafts_for_unsupported_values(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _extra_site(target)
+    _write_extra_post(vault, "score: .nan\n", name="secret", draft=True)
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, "unsupported_extra_value" in stdout) == (1, True)
+
+
+# --- validate: wikilinks resolve as in build --------------------------------
+
+
+def _write_linked_post(vault: Path, name: str, body: str, *, slug: bool = True) -> None:
+    slug_line = f"slug: {name}\n" if slug else ""
+    (vault / f"Blogs/Demo/{name}.md").write_text(
+        f"---\ntitle: {name.upper()}\n{slug_line}date: 2026-08-14\n---\n{body}\n",
+        encoding="utf-8",
+    )
+
+
+def test_cli_validate_fails_on_broken_wikilink(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_linked_post(vault, "a", "See [[Missing]].")
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, "broken_wikilink" in stdout, "'Missing'" in stdout) == (1, True, True)
+
+
+def test_cli_validate_passes_with_valid_wikilink(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_linked_post(vault, "a", "See [[b]] and [[B|the other post]].")
+    _write_linked_post(vault, "b", "No links.")
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, stdout.splitlines()[-1]) == (0, "0 issue(s)")
+
+
+def test_cli_validate_ignores_wikilink_in_code(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_linked_post(vault, "a", "Inline `[[Missing]]`.\n\n```\n[[Also Missing]]\n```")
+    exit_code, _ = _validate(vault, target)
+    assert exit_code == 0
+
+
+def test_cli_validate_checks_body_with_quotes(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_linked_post(vault, "a", 'A "quoted" word and [[Missing]].')
+    exit_code, stdout = _validate(vault, target)
+    assert (exit_code, "broken_wikilink" in stdout) == (1, True)
+
+
+def test_cli_validate_link_to_slugless_post_resolves(fixture: tuple[Path, Path]) -> None:
+    vault, target = fixture
+    _write_linked_post(vault, "a", "See [[d]].")
+    _write_linked_post(vault, "d", "No slug yet.", slug=False)
+    result = CliRunner().invoke(app, ["validate", "--vault", str(vault), "--target", str(target)])
+    issue_types = [line.split(":")[0] for line in result.stdout.splitlines()[:-1]]
+    assert (type(result.exception), issue_types) == (SystemExit, ["missing_slug"])
